@@ -2,180 +2,179 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>Firebase Chat App with Groups & TTS</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Firebase Chat</title>
 <style>
-:root {
-  --bg: #121212;
-  --card: #1f1f1f;
-  --muted: rgba(255,255,255,0.7);
-  --accent: #00ccff;
-  --admin-gradient: linear-gradient(90deg,#ff00ff,#00ffff);
-}
-body { margin:0; font-family:Arial,sans-serif; background:var(--bg); color:white; }
-#login, #chat { display:none; padding:20px; }
-input, select, button { margin:5px; padding:8px; border-radius:5px; border:none; }
-button { background:var(--accent); color:#fff; cursor:pointer; }
-#chatBox { max-height:60vh; overflow-y:auto; background:var(--card); padding:10px; border-radius:8px; margin-bottom:10px; }
-.message { margin-bottom:10px; }
-.admin { background:var(--admin-gradient); -webkit-background-clip:text; -webkit-text-fill-color:transparent; font-weight:bold; }
-#roomSelect { margin-bottom:10px; }
+  body { margin:0; font-family:Arial,sans-serif; background:#121212; color:white; }
+  #login, #chat, #adminPanel { display:none; padding:20px; }
+  input, select, button { margin:5px 0; padding:8px; width:100%; }
+  .message { margin:5px 0; padding:5px; border-radius:5px; background:#1f1f1f; }
+  .admin { background: linear-gradient(90deg, #ff00ff, #00ffff); -webkit-background-clip: text; color:transparent; font-weight:bold; }
+  #messages { max-height:300px; overflow-y:auto; margin-bottom:10px; }
 </style>
 </head>
 <body>
 
 <div id="login">
   <h2>Login / Register</h2>
-  <input id="email" type="email" placeholder="Email"><br>
-  <input id="password" type="password" placeholder="Password"><br>
-  <input id="invite" type="text" placeholder="Invite Code"><br>
-  <button onclick="register()">Register</button>
-  <button onclick="login()">Login</button>
+  <input type="email" id="email" placeholder="Email">
+  <input type="password" id="password" placeholder="Password">
+  <input type="text" id="nickname" placeholder="Nickname">
+  <input type="text" id="inviteCode" placeholder="Invite Code">
+  <button id="registerBtn">Register</button>
+  <button id="loginBtn">Login</button>
 </div>
 
 <div id="chat">
   <h2>Chat Rooms</h2>
   <select id="roomSelect"></select>
-  <div id="chatBox"></div>
-  <input id="msgInput" type="text" placeholder="Type a message">
-  <button onclick="sendMessage()">Send</button>
+  <div id="messages"></div>
+  <input type="text" id="messageInput" placeholder="Type a message">
   <input type="file" id="fileInput">
+  <button id="sendBtn">Send</button>
+  <button id="logoutBtn">Logout</button>
 </div>
 
-<audio id="notifSound" src="https://www.soundjay.com/buttons/sounds/button-3.mp3" preload="auto"></audio>
+<div id="adminPanel">
+  <h2>Admin Panel</h2>
+  <div id="adminMessages"></div>
+</div>
 
-<script type="module">
-// Firebase setup
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.3.0/firebase-app.js";
-import { getDatabase, ref, push, onChildAdded, query, orderByChild, onChildRemoved, get } from "https://www.gstatic.com/firebasejs/10.3.0/firebase-database.js";
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.3.0/firebase-auth.js";
-import { getStorage, ref as sRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.3.0/firebase-storage.js";
+<audio id="notifSound" src="https://www.soundjay.com/buttons/sounds/button-3.mp3"></audio>
 
-// Firebase config
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+
+<script>
+// -------- Firebase Config --------
 const firebaseConfig = {
   apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_DOMAIN",
-  databaseURL: "YOUR_DB_URL",
+  authDomain: "YOUR_PROJECT.firebaseapp.com",
+  databaseURL: "https://YOUR_PROJECT.firebaseio.com",
   projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_BUCKET",
+  storageBucket: "YOUR_PROJECT.appspot.com",
   messagingSenderId: "YOUR_SENDER_ID",
   appId: "YOUR_APP_ID"
 };
-const app = initializeApp(firebaseConfig);
-const db = getDatabase(app);
-const auth = getAuth(app);
-const storage = getStorage(app);
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.database();
+const storage = firebase.storage();
 
-let currentRoom = "general";
-let messagesRef;
-const chatBox = document.getElementById("chatBox");
+// -------- Elements --------
+const loginDiv = document.getElementById("login");
+const chatDiv = document.getElementById("chat");
+const adminPanel = document.getElementById("adminPanel");
+const emailInput = document.getElementById("email");
+const passwordInput = document.getElementById("password");
+const nicknameInput = document.getElementById("nickname");
+const inviteInput = document.getElementById("inviteCode");
+const registerBtn = document.getElementById("registerBtn");
+const loginBtn = document.getElementById("loginBtn");
+const logoutBtn = document.getElementById("logoutBtn");
 const roomSelect = document.getElementById("roomSelect");
+const messagesDiv = document.getElementById("messages");
+const messageInput = document.getElementById("messageInput");
+const sendBtn = document.getElementById("sendBtn");
+const fileInput = document.getElementById("fileInput");
 const notifSound = document.getElementById("notifSound");
-let currentNickname = "";
 
-// Escape HTML
-function escapeHtml(text) { return text.replace(/'/g,"&#39;").replace(/"/g,"&quot;"); }
+// -------- Invite Code --------
+const INVITE_CODE = "CHAT123"; // change as needed
 
-// Text-to-speech
-function speakMessage(text){
-  if(!window.speechSynthesis) return;
-  const utter = new SpeechSynthesisUtterance(text);
-  window.speechSynthesis.speak(utter);
+// -------- Auth --------
+registerBtn.onclick = () => {
+  if(inviteInput.value !== INVITE_CODE){ alert("Invalid invite code"); return; }
+  auth.createUserWithEmailAndPassword(emailInput.value, passwordInput.value)
+  .then(cred => {
+    db.ref("users/"+cred.user.uid).set({nickname: nicknameInput.value, email: emailInput.value, admin:false});
+  }).catch(alert);
 }
 
-// Load rooms
-async function loadRooms(){
-  const snap = await get(ref(db,"rooms"));
-  roomSelect.innerHTML = "";
-  if(snap.exists()){
-    const rooms = snap.val();
-    Object.entries(rooms).forEach(([roomId, roomData])=>{
+loginBtn.onclick = () => {
+  auth.signInWithEmailAndPassword(emailInput.value, passwordInput.value)
+  .catch(alert);
+}
+
+logoutBtn.onclick = () => { auth.signOut(); };
+
+// -------- Load Rooms --------
+function loadRooms(){
+  db.ref("rooms").once("value").then(snapshot => {
+    roomSelect.innerHTML = "";
+    snapshot.forEach(r => {
       const opt = document.createElement("option");
-      opt.value = roomId;
-      opt.textContent = roomData.name || roomId;
+      opt.value = r.key;
+      opt.textContent = r.val().name;
       roomSelect.appendChild(opt);
     });
-  }
-  roomSelect.value = currentRoom;
-  roomSelect.onchange = () => { currentRoom = roomSelect.value; loadMessages(); };
-}
-loadRooms();
-
-// Send message
-async function sendMessage(){
-  const text = document.getElementById("msgInput").value;
-  const fileInput = document.getElementById("fileInput");
-  let fileUrl = "";
-
-  if(fileInput.files.length > 0){
-    const file = fileInput.files[0];
-    const storageRef = sRef(storage, `files/${Date.now()}_${file.name}`);
-    await uploadBytes(storageRef, file);
-    fileUrl = await getDownloadURL(storageRef);
-  }
-
-  if(!text && !fileUrl) return;
-  const user = auth.currentUser;
-  if(!user) return alert("Login first");
-
-  const msgRef = ref(db, `messages/${currentRoom}`);
-  await push(msgRef,{
-    uid:user.uid,
-    email:user.email,
-    nickname: currentNickname,
-    text:text,
-    fileUrl:fileUrl,
-    timestamp:Date.now()
   });
-  document.getElementById("msgInput").value="";
-  fileInput.value="";
 }
 
-// Load messages
-function loadMessages(){
-  if(messagesRef) onChildRemoved(messagesRef); // detach old listener
-  chatBox.innerHTML="";
-  messagesRef = query(ref(db, `messages/${currentRoom}`), orderByChild("timestamp"));
-  onChildAdded(messagesRef, snap=>{
+// -------- Load Messages --------
+function loadMessages(room){
+  messagesDiv.innerHTML = "";
+  const msgsRef = db.ref("messages/"+room);
+  msgsRef.off(); // remove old listeners
+  msgsRef.on("child_added", snap => {
     const msg = snap.val();
     const div = document.createElement("div");
     div.className = "message";
-    let nameClass = (msg.email==="admin@example.com")?"admin":"";
-    div.innerHTML = `<strong class="${nameClass}">${escapeHtml(msg.nickname)}</strong>: 
-      ${msg.text?escapeHtml(msg.text):""} 
-      ${msg.text?`<span style="cursor:pointer;color:#00ccff;font-weight:bold;" onclick="speakMessage('${escapeHtml(msg.text)}')">🔊</span>`:""}
-      ${msg.fileUrl?`<a href="${msg.fileUrl}" target="_blank">[File]</a>`:""}`;
-    chatBox.appendChild(div);
-    chatBox.scrollTop = chatBox.scrollHeight;
+    if(msg.admin) div.innerHTML = `<span class="admin">${msg.nickname}:</span> ${msg.text || ""}`;
+    else div.textContent = msg.nickname + ": " + (msg.text || "");
+    if(msg.file) div.innerHTML += `<br><a href="${msg.file}" target="_blank">[File]</a>`;
+    messagesDiv.appendChild(div);
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
     notifSound.play();
+    // text-to-speech
+    if(msg.text) new SpeechSynthesisUtterance(msg.text).voice = speechSynthesis.getVoices()[0], speechSynthesis.speak(new SpeechSynthesisUtterance(msg.text));
   });
 }
-loadMessages();
 
-// Auth
-function register(){
-  const email = document.getElementById("email").value;
-  const pass = document.getElementById("password").value;
-  const invite = document.getElementById("invite").value;
-  if(invite!=="1234") return alert("Invalid invite code!");
-  createUserWithEmailAndPassword(auth,email,pass).then(userCred=>{
-    currentNickname = email.split("@")[0];
-    document.getElementById("login").style.display="none";
-    document.getElementById("chat").style.display="block";
-  }).catch(console.error);
-}
-function login(){
-  const email = document.getElementById("email").value;
-  const pass = document.getElementById("password").value;
-  signInWithEmailAndPassword(auth,email,pass).then(userCred=>{
-    currentNickname = email.split("@")[0];
-    document.getElementById("login").style.display="none";
-    document.getElementById("chat").style.display="block";
-  }).catch(console.error);
+// -------- Send Message --------
+sendBtn.onclick = () => {
+  const room = roomSelect.value;
+  const text = messageInput.value;
+  const file = fileInput.files[0];
+  if(!room) return alert("Select room");
+  if(file){
+    const ref = storage.ref("files/"+Date.now()+"_"+file.name);
+    ref.put(file).then(() => ref.getDownloadURL().then(url => {
+      db.ref("messages/"+room).push({nickname:nicknameInput.value,text:text||"",file:url,timestamp:Date.now()});
+    }));
+  } else {
+    db.ref("messages/"+room).push({nickname:nicknameInput.value,text:text||"",timestamp:Date.now()});
+  }
+  messageInput.value="";
+  fileInput.value="";
 }
 
-// Show login initially
-document.getElementById("login").style.display="block";
+// -------- Room Change --------
+roomSelect.onchange = () => { loadMessages(roomSelect.value); }
+
+// -------- Auth State --------
+auth.onAuthStateChanged(user => {
+  if(user){
+    loginDiv.style.display="none";
+    chatDiv.style.display="block";
+    loadRooms();
+    // load first room messages
+    setTimeout(()=>{ if(roomSelect.value) loadMessages(roomSelect.value); },500);
+  } else {
+    loginDiv.style.display="block";
+    chatDiv.style.display="none";
+  }
+});
+
+// -------- Preload Demo Rooms & Messages --------
+db.ref("rooms").once("value").then(snap => {
+  if(!snap.exists()){
+    db.ref("rooms").set({general:{name:"General"},games:{name:"Games"}});
+    db.ref("messages/general").push({nickname:"Admin",text:"Welcome to the chat!",admin:true,timestamp:Date.now()});
+  }
+});
 </script>
 </body>
 </html>
