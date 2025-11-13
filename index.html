@@ -11,7 +11,7 @@
   input, select, button, textarea { padding: 8px; margin: 5px 0; width: 100%; border: none; border-radius: 4px; }
   button { background: #0078ff; color: #fff; cursor: pointer; }
   button:hover { background: #005fcc; }
-  .message { margin-bottom: 10px; }
+  .message { margin-bottom: 10px; word-break: break-word; }
   .admin { background: linear-gradient(90deg, #ff0, #f0f); -webkit-background-clip: text; color: transparent; font-weight: bold; }
 </style>
 </head>
@@ -19,7 +19,7 @@
 
 <div id="login">
   <h2>Login / Register</h2>
-  <input id="username" placeholder="Enter username">
+  <input id="username" placeholder="Enter username or email">
   <input id="invite" placeholder="Enter invite code">
   <button id="loginBtn">Login</button>
 </div>
@@ -38,11 +38,11 @@
 
 <script>
 const INVITE_CODE = "SCHOOL123";
+const ADMIN_USER = "uyiog_aghay195@ahschools.us";
 let currentUser = "";
 let currentGroup = "";
 let ttsEnabled = false;
 
-// Show login first
 document.getElementById('login').style.display = 'block';
 
 document.getElementById('loginBtn').onclick = () => {
@@ -116,7 +116,8 @@ function loadMessages() {
   messages.forEach(m => {
     const div = document.createElement('div');
     div.className = 'message';
-    div.innerHTML = `<strong class="${m.user.toLowerCase() === 'admin' ? 'admin' : ''}">${m.user}:</strong> ${m.text}`;
+    const isAdmin = m.user.toLowerCase() === ADMIN_USER.toLowerCase();
+    div.innerHTML = `<strong class="${isAdmin ? 'admin' : ''}">${m.user}:</strong> ${m.text}`;
     if (m.fileName) {
       const a = document.createElement('a');
       a.href = m.text;
