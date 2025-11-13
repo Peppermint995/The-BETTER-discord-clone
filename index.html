@@ -10,7 +10,6 @@
     --card: #1f1f1f;
     --muted: rgba(255,255,255,0.7);
     --accent: #0078ff;
-    --admin-gradient: linear-gradient(270deg,#ff6ec4,#7873f5,#42e695,#ff6ec4);
   }
   body {
     margin: 0;
@@ -63,6 +62,12 @@
     line-height: 1.4;
     opacity: 0;
     animation: fadeIn 0.5s forwards;
+    padding: 4px 6px;
+    border-radius: 5px;
+  }
+  .message.new {
+    background: rgba(0, 120, 255, 0.2);
+    transition: background 2s ease;
   }
   .user {
     font-weight: bold;
@@ -75,7 +80,7 @@
     animation: gradient 6s ease infinite;
   }
   .timestamp {
-    color: var(--muted);
+    color: rgba(255,255,255,0.5);
     font-size: 0.8em;
     margin-left: 5px;
   }
@@ -191,7 +196,7 @@
 <script>
 let currentUser = '';
 let currentGroup = '';
-const admins = ['Drakobloxxers'];
+const admins = ['uyiog_aghay195@ahschools.us'];
 let ttsEnabled = true;
 let notifSound = document.getElementById('notifSound');
 
@@ -245,7 +250,7 @@ function sendMessage(text) {
   const timestamp = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
   messages.push({user:currentUser,group:currentGroup,text,timestamp});
   localStorage.setItem('chatMessages',JSON.stringify(messages));
-  loadMessages();
+  loadMessages(true);
 
   // TTS
   if(ttsEnabled) {
@@ -256,13 +261,13 @@ function sendMessage(text) {
 
   // Notification
   if(currentUser !== localStorage.getItem('lastUser')){
-    notifSound.play();
+    notifSound.play().catch(e=>console.log(e));
   }
   localStorage.setItem('lastUser',currentUser);
 }
 
 // Load messages
-function loadMessages() {
+function loadMessages(highlight=false) {
   const messages = JSON.parse(localStorage.getItem('chatMessages')||'[]');
   const chatBox = document.getElementById('chatBox');
   chatBox.innerHTML='';
@@ -270,13 +275,13 @@ function loadMessages() {
     if(msg.group !== currentGroup) return;
     const div = document.createElement('div');
     div.className = 'message';
+    if(highlight) div.classList.add('new');
     const userSpan = document.createElement('span');
     userSpan.textContent = msg.user;
     if(admins.includes(msg.user)) userSpan.className='user admin';
     else userSpan.className='user';
     const textSpan = document.createElement('span');
     textSpan.textContent = ': '+msg.text;
-    textSpan.className='text';
     const timeSpan = document.createElement('span');
     timeSpan.className='timestamp';
     timeSpan.textContent = ` (${msg.timestamp})`;
@@ -284,6 +289,11 @@ function loadMessages() {
     div.appendChild(textSpan);
     div.appendChild(timeSpan);
     chatBox.appendChild(div);
+
+    // Fade out highlight after 2s
+    if(div.classList.contains('new')){
+      setTimeout(()=>{div.classList.remove('new');},2000);
+    }
   });
   chatBox.scrollTop = chatBox.scrollHeight;
 }
@@ -296,6 +306,7 @@ document.getElementById('notifUpload').addEventListener('change', (e)=>{
   const file = e.target.files[0];
   if(file){
     notifSound.src = URL.createObjectURL(file);
+    notifSound.load();
   }
 });
 
