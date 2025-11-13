@@ -2,300 +2,180 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Realtime Multi-Room Chat</title>
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Firebase Chat App with Groups & TTS</title>
 <style>
-  :root {
-    --bg: #121212;
-    --card: #1f1f1f;
-    --muted: rgba(255,255,255,0.7);
-    --accent: #00bfff;
-  }
-
-  body {
-    margin: 0;
-    font-family: Arial, sans-serif;
-    background: var(--bg);
-    color: white;
-    display: flex;
-    flex-direction: column;
-    height: 100vh;
-  }
-
-  header {
-    padding: 10px;
-    background: var(--card);
-    text-align: center;
-    font-size: 1.5em;
-    font-weight: bold;
-  }
-
-  #login, #chat {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-  }
-
-  input, button, select {
-    padding: 8px;
-    margin: 5px;
-    border-radius: 5px;
-    border: none;
-  }
-
-  #messages {
-    flex: 1;
-    width: 90%;
-    overflow-y: auto;
-    margin: 10px 0;
-    border: 1px solid var(--muted);
-    padding: 10px;
-    border-radius: 5px;
-    background: #1a1a1a;
-  }
-
-  .message {
-    margin-bottom: 8px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-
-  .username {
-    font-weight: bold;
-  }
-
-  .file-link {
-    color: var(--accent);
-    text-decoration: underline;
-    cursor: pointer;
-  }
-
-  @keyframes gradientShift {
-    0% { background-position: 0% 50%; }
-    50% { background-position: 100% 50%; }
-    100% { background-position: 0% 50%; }
-  }
-
+:root {
+  --bg: #121212;
+  --card: #1f1f1f;
+  --muted: rgba(255,255,255,0.7);
+  --accent: #00ccff;
+  --admin-gradient: linear-gradient(90deg,#ff00ff,#00ffff);
+}
+body { margin:0; font-family:Arial,sans-serif; background:var(--bg); color:white; }
+#login, #chat { display:none; padding:20px; }
+input, select, button { margin:5px; padding:8px; border-radius:5px; border:none; }
+button { background:var(--accent); color:#fff; cursor:pointer; }
+#chatBox { max-height:60vh; overflow-y:auto; background:var(--card); padding:10px; border-radius:8px; margin-bottom:10px; }
+.message { margin-bottom:10px; }
+.admin { background:var(--admin-gradient); -webkit-background-clip:text; -webkit-text-fill-color:transparent; font-weight:bold; }
+#roomSelect { margin-bottom:10px; }
 </style>
 </head>
 <body>
 
-<header>Realtime Multi-Room Chat</header>
-
 <div id="login">
-  <input type="text" id="email" placeholder="Email">
-  <input type="text" id="username" placeholder="Username">
-  <input type="text" id="inviteCode" placeholder="Invite Code (if not admin)">
-  <button onclick="login()">Join Chat</button>
+  <h2>Login / Register</h2>
+  <input id="email" type="email" placeholder="Email"><br>
+  <input id="password" type="password" placeholder="Password"><br>
+  <input id="invite" type="text" placeholder="Invite Code"><br>
+  <button onclick="register()">Register</button>
+  <button onclick="login()">Login</button>
 </div>
 
-<div id="chat" style="display:none;">
-  <div style="width:90%; display:flex; justify-content: space-between; align-items:center;">
-    <select id="roomSelect" onchange="changeRoom()"></select>
-    <button onclick="createRoom()">New Room</button>
-  </div>
-  <div id="messages"></div>
-  <div style="width:90%; display:flex; justify-content: space-between;">
-    <input type="text" id="messageInput" placeholder="Type a message">
-    <input type="file" id="fileInput">
-    <button onclick="sendMessage()">Send</button>
-  </div>
-
-  <div id="adminPanel" style="display:none; width:90%; margin-top:10px; border:1px solid var(--muted); padding:10px; border-radius:5px;">
-    <h3>Admin Panel</h3>
-    <input type="text" id="newInvite" placeholder="Generate invite code">
-    <button onclick="generateInvite()">Generate Code</button>
-    <input type="color" id="nameColor" value="#ff7e5f">
-    <select id="nameEffect">
-      <option value="none">None</option>
-      <option value="gradient">Gradient Animation</option>
-    </select>
-  </div>
+<div id="chat">
+  <h2>Chat Rooms</h2>
+  <select id="roomSelect"></select>
+  <div id="chatBox"></div>
+  <input id="msgInput" type="text" placeholder="Type a message">
+  <button onclick="sendMessage()">Send</button>
+  <input type="file" id="fileInput">
 </div>
 
-<script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-database-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-storage-compat.js"></script>
+<audio id="notifSound" src="https://www.soundjay.com/buttons/sounds/button-3.mp3" preload="auto"></audio>
 
-<script>
+<script type="module">
+// Firebase setup
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.3.0/firebase-app.js";
+import { getDatabase, ref, push, onChildAdded, query, orderByChild, onChildRemoved, get } from "https://www.gstatic.com/firebasejs/10.3.0/firebase-database.js";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.3.0/firebase-auth.js";
+import { getStorage, ref as sRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.3.0/firebase-storage.js";
+
+// Firebase config
 const firebaseConfig = {
   apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT.firebaseapp.com",
-  databaseURL: "https://YOUR_PROJECT.firebaseio.com",
-  projectId: "YOUR_PROJECT",
-  storageBucket: "YOUR_PROJECT.appspot.com",
-  messagingSenderId: "SENDER_ID",
-  appId: "APP_ID"
+  authDomain: "YOUR_DOMAIN",
+  databaseURL: "YOUR_DB_URL",
+  projectId: "YOUR_PROJECT_ID",
+  storageBucket: "YOUR_BUCKET",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId: "YOUR_APP_ID"
 };
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+const auth = getAuth(app);
+const storage = getStorage(app);
 
-firebase.initializeApp(firebaseConfig);
-const db = firebase.database();
-const storage = firebase.storage();
-
-let currentUser = "";
-let isAdmin = false;
-let userColor = "#ff7e5f";
-let userEffect = "none";
 let currentRoom = "general";
+let messagesRef;
+const chatBox = document.getElementById("chatBox");
+const roomSelect = document.getElementById("roomSelect");
+const notifSound = document.getElementById("notifSound");
+let currentNickname = "";
 
-const adminEmails = ["uyiog_aghay195@ahschools.us"];
-let validInviteCodes = ["SCHOOL123"];
-const bannedUsers = {};
-const mutedUsers = {};
+// Escape HTML
+function escapeHtml(text) { return text.replace(/'/g,"&#39;").replace(/"/g,"&quot;"); }
 
-function login() {
-  const email = document.getElementById('email').value.trim().toLowerCase();
-  const username = document.getElementById('username').value.trim();
-  const code = document.getElementById('inviteCode').value.trim();
-
-  if(!email || !username){
-    alert("Enter both email and username!");
-    return;
-  }
-
-  if(adminEmails.includes(email)){
-    isAdmin = true;
-  } else if(validInviteCodes.includes(code)){
-    isAdmin = false;
-  } else {
-    alert("Invalid invite code!");
-    return;
-  }
-
-  currentUser = username;
-  document.getElementById('login').style.display = "none";
-  document.getElementById('chat').style.display = "flex";
-
-  if(isAdmin){
-    document.getElementById('adminPanel').style.display = "block";
-  }
-
-  setupRooms();
+// Text-to-speech
+function speakMessage(text){
+  if(!window.speechSynthesis) return;
+  const utter = new SpeechSynthesisUtterance(text);
+  window.speechSynthesis.speak(utter);
 }
 
-// Room management
-function setupRooms(){
-  const roomSelect = document.getElementById('roomSelect');
-  db.ref('rooms').once('value', snap=>{
-    roomSelect.innerHTML = "";
-    snap.forEach(r=>{
-      const opt = document.createElement('option');
-      opt.value = r.key;
-      opt.textContent = r.key;
+// Load rooms
+async function loadRooms(){
+  const snap = await get(ref(db,"rooms"));
+  roomSelect.innerHTML = "";
+  if(snap.exists()){
+    const rooms = snap.val();
+    Object.entries(rooms).forEach(([roomId, roomData])=>{
+      const opt = document.createElement("option");
+      opt.value = roomId;
+      opt.textContent = roomData.name || roomId;
       roomSelect.appendChild(opt);
     });
-    if(!snap.hasChild('general')) db.ref('rooms/general').set(true);
-    roomSelect.value = currentRoom;
-    listenMessages();
-  });
-}
-
-function createRoom(){
-  const name = prompt("Enter room name:");
-  if(name){
-    db.ref('rooms/'+name).set(true);
-    currentRoom = name;
-    document.getElementById('roomSelect').value = name;
-    listenMessages();
   }
+  roomSelect.value = currentRoom;
+  roomSelect.onchange = () => { currentRoom = roomSelect.value; loadMessages(); };
 }
+loadRooms();
 
-function changeRoom(){
-  currentRoom = document.getElementById('roomSelect').value;
-  listenMessages();
-}
-
-// Chat functions
-function listenMessages() {
-  const messagesDiv = document.getElementById('messages');
-  messagesDiv.innerHTML = "";
-  const messagesRef = db.ref('messages/' + currentRoom);
-  messagesRef.off();
-  messagesRef.on('child_added', snapshot => {
-    const data = snapshot.val();
-    if(bannedUsers[data.username]) return;
-    displayMessage(data.username, data.message, data.fileUrl, snapshot.key, data.color, data.effect);
-  });
-}
-
-async function sendMessage() {
-  if(mutedUsers[currentUser]) return;
-  const messageInput = document.getElementById('messageInput');
-  const fileInput = document.getElementById('fileInput');
-  const message = messageInput.value.trim();
-  let fileUrl = null;
+// Send message
+async function sendMessage(){
+  const text = document.getElementById("msgInput").value;
+  const fileInput = document.getElementById("fileInput");
+  let fileUrl = "";
 
   if(fileInput.files.length > 0){
     const file = fileInput.files[0];
-    const storageRef = storage.ref('files/' + Date.now() + '_' + file.name);
-    await storageRef.put(file);
-    fileUrl = await storageRef.getDownloadURL();
-    fileInput.value = "";
+    const storageRef = sRef(storage, `files/${Date.now()}_${file.name}`);
+    await uploadBytes(storageRef, file);
+    fileUrl = await getDownloadURL(storageRef);
   }
 
-  if(!message && !fileUrl) return;
+  if(!text && !fileUrl) return;
+  const user = auth.currentUser;
+  if(!user) return alert("Login first");
 
-  db.ref('messages/' + currentRoom).push().set({
-    username: currentUser,
-    message,
-    fileUrl,
-    timestamp: Date.now(),
-    color: userColor,
-    effect: userEffect
+  const msgRef = ref(db, `messages/${currentRoom}`);
+  await push(msgRef,{
+    uid:user.uid,
+    email:user.email,
+    nickname: currentNickname,
+    text:text,
+    fileUrl:fileUrl,
+    timestamp:Date.now()
   });
-
-  // Text to speech
-  if(message) {
-    const msg = new SpeechSynthesisUtterance(`${currentUser} says ${message}`);
-    speechSynthesis.speak(msg);
-  }
-
-  messageInput.value = "";
+  document.getElementById("msgInput").value="";
+  fileInput.value="";
 }
 
-function displayMessage(username, message, fileUrl, key, color="#fff", effect="none"){
-  const messagesDiv = document.getElementById('messages');
-  const div = document.createElement('div');
-  div.className = "message";
+// Load messages
+function loadMessages(){
+  if(messagesRef) onChildRemoved(messagesRef); // detach old listener
+  chatBox.innerHTML="";
+  messagesRef = query(ref(db, `messages/${currentRoom}`), orderByChild("timestamp"));
+  onChildAdded(messagesRef, snap=>{
+    const msg = snap.val();
+    const div = document.createElement("div");
+    div.className = "message";
+    let nameClass = (msg.email==="admin@example.com")?"admin":"";
+    div.innerHTML = `<strong class="${nameClass}">${escapeHtml(msg.nickname)}</strong>: 
+      ${msg.text?escapeHtml(msg.text):""} 
+      ${msg.text?`<span style="cursor:pointer;color:#00ccff;font-weight:bold;" onclick="speakMessage('${escapeHtml(msg.text)}')">🔊</span>`:""}
+      ${msg.fileUrl?`<a href="${msg.fileUrl}" target="_blank">[File]</a>`:""}`;
+    chatBox.appendChild(div);
+    chatBox.scrollTop = chatBox.scrollHeight;
+    notifSound.play();
+  });
+}
+loadMessages();
 
-  let nameStyle = effect==="gradient" 
-    ? `background: linear-gradient(270deg, #ff7e5f, #feb47b, #ff7e5f); background-size:600% 600%; -webkit-background-clip:text; -webkit-text-fill-color:transparent; animation: gradientShift 5s ease infinite;`
-    : `color:${color}`;
-
-  div.innerHTML = `<span class="username" style="${nameStyle}">${username}</span>: ${message ? message : ''} ` +
-                  `${fileUrl ? `<a class="file-link" href="${fileUrl}" target="_blank">[File]</a>` : ''}`;
-
-  if(isAdmin){
-    div.innerHTML += `
-      <button onclick="muteUser('${username}')">Mute</button>
-      <button onclick="kickUser('${username}')">Kick</button>
-      <button onclick="banUser('${username}')">Ban</button>
-    `;
-  }
-
-  messagesDiv.appendChild(div);
-  messagesDiv.scrollTop = messagesDiv.scrollHeight;
+// Auth
+function register(){
+  const email = document.getElementById("email").value;
+  const pass = document.getElementById("password").value;
+  const invite = document.getElementById("invite").value;
+  if(invite!=="1234") return alert("Invalid invite code!");
+  createUserWithEmailAndPassword(auth,email,pass).then(userCred=>{
+    currentNickname = email.split("@")[0];
+    document.getElementById("login").style.display="none";
+    document.getElementById("chat").style.display="block";
+  }).catch(console.error);
+}
+function login(){
+  const email = document.getElementById("email").value;
+  const pass = document.getElementById("password").value;
+  signInWithEmailAndPassword(auth,email,pass).then(userCred=>{
+    currentNickname = email.split("@")[0];
+    document.getElementById("login").style.display="none";
+    document.getElementById("chat").style.display="block";
+  }).catch(console.error);
 }
 
-// Admin controls
-function muteUser(username){ mutedUsers[username] = true; }
-function kickUser(username){ alert(`${username} kicked!`); }
-function banUser(username){ bannedUsers[username] = true; }
-
-// Admin invite generation
-function generateInvite(){
-  const code = Math.random().toString(36).substring(2, 8).toUpperCase();
-  validInviteCodes.push(code);
-  alert("Generated invite code: " + code);
-}
-
-document.getElementById('nameColor').addEventListener('input', e => { userColor = e.target.value; });
-document.getElementById('nameEffect').addEventListener('change', e => { userEffect = e.target.value; });
-
+// Show login initially
+document.getElementById("login").style.display="block";
 </script>
-
 </body>
 </html>
