@@ -3,178 +3,160 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Firebase Chat</title>
+<title>Local Chat App</title>
 <style>
-  body { margin:0; font-family:Arial,sans-serif; background:#121212; color:white; }
-  #login, #chat, #adminPanel { display:none; padding:20px; }
-  input, select, button { margin:5px 0; padding:8px; width:100%; }
-  .message { margin:5px 0; padding:5px; border-radius:5px; background:#1f1f1f; }
-  .admin { background: linear-gradient(90deg, #ff00ff, #00ffff); -webkit-background-clip: text; color:transparent; font-weight:bold; }
-  #messages { max-height:300px; overflow-y:auto; margin-bottom:10px; }
+  body { margin: 0; font-family: Arial, sans-serif; background: #121212; color: #fff; }
+  .hidden { display: none; }
+  #login, #chat { padding: 20px; }
+  input, button { padding: 10px; margin: 5px 0; width: 100%; }
+  #messages { height: 300px; overflow-y: auto; border: 1px solid #555; padding: 10px; background: #1f1f1f; margin-bottom: 10px; }
+  .message { margin-bottom: 5px; }
+  .group { font-weight: bold; color: #00f; }
 </style>
 </head>
 <body>
 
 <div id="login">
   <h2>Login / Register</h2>
-  <input type="email" id="email" placeholder="Email">
-  <input type="password" id="password" placeholder="Password">
-  <input type="text" id="nickname" placeholder="Nickname">
-  <input type="text" id="inviteCode" placeholder="Invite Code">
-  <button id="registerBtn">Register</button>
-  <button id="loginBtn">Login</button>
+  <input type="text" id="username" placeholder="Username">
+  <input type="password" id="inviteCode" placeholder="Invite Code">
+  <button id="loginBtn">Enter Chat</button>
+  <p id="loginError" style="color:red;"></p>
 </div>
 
-<div id="chat">
-  <h2>Chat Rooms</h2>
-  <select id="roomSelect"></select>
+<div id="chat" class="hidden">
+  <h2>Local Chat</h2>
+  <select id="groupSelect"></select>
   <div id="messages"></div>
-  <input type="text" id="messageInput" placeholder="Type a message">
+  <input type="text" id="msgInput" placeholder="Type a message">
   <input type="file" id="fileInput">
   <button id="sendBtn">Send</button>
-  <button id="logoutBtn">Logout</button>
+  <button id="ttsBtn">Speak Last Message</button>
 </div>
 
-<div id="adminPanel">
-  <h2>Admin Panel</h2>
-  <div id="adminMessages"></div>
-</div>
-
-<audio id="notifSound" src="https://www.soundjay.com/buttons/sounds/button-3.mp3"></audio>
-
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+<audio id="notifSound" src="https://www.myinstants.com/media/sounds/bleep.mp3" preload="auto"></audio>
 
 <script>
-// -------- Firebase Config --------
-const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT.firebaseapp.com",
-  databaseURL: "https://YOUR_PROJECT.firebaseio.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID"
-};
-firebase.initializeApp(firebaseConfig);
-const auth = firebase.auth();
-const db = firebase.database();
-const storage = firebase.storage();
+const INVITE_CODE = "SCHOOL123"; // Example invite code
+let username = "";
+let currentGroup = "General";
 
-// -------- Elements --------
-const loginDiv = document.getElementById("login");
-const chatDiv = document.getElementById("chat");
-const adminPanel = document.getElementById("adminPanel");
-const emailInput = document.getElementById("email");
-const passwordInput = document.getElementById("password");
-const nicknameInput = document.getElementById("nickname");
-const inviteInput = document.getElementById("inviteCode");
-const registerBtn = document.getElementById("registerBtn");
-const loginBtn = document.getElementById("loginBtn");
-const logoutBtn = document.getElementById("logoutBtn");
-const roomSelect = document.getElementById("roomSelect");
-const messagesDiv = document.getElementById("messages");
-const messageInput = document.getElementById("messageInput");
-const sendBtn = document.getElementById("sendBtn");
-const fileInput = document.getElementById("fileInput");
-const notifSound = document.getElementById("notifSound");
+// Local storage for messages and groups
+let messages = JSON.parse(localStorage.getItem('messages')) || {};
+let groups = JSON.parse(localStorage.getItem('groups')) || ["General"];
 
-// -------- Invite Code --------
-const INVITE_CODE = "CHAT123"; // change as needed
+// Elements
+const loginDiv = document.getElementById('login');
+const chatDiv = document.getElementById('chat');
+const usernameInput = document.getElementById('username');
+const inviteInput = document.getElementById('inviteCode');
+const loginBtn = document.getElementById('loginBtn');
+const loginError = document.getElementById('loginError');
+const messagesDiv = document.getElementById('messages');
+const msgInput = document.getElementById('msgInput');
+const sendBtn = document.getElementById('sendBtn');
+const groupSelect = document.getElementById('groupSelect');
+const fileInput = document.getElementById('fileInput');
+const ttsBtn = document.getElementById('ttsBtn');
+const notifSound = document.getElementById('notifSound');
 
-// -------- Auth --------
-registerBtn.onclick = () => {
-  if(inviteInput.value !== INVITE_CODE){ alert("Invalid invite code"); return; }
-  auth.createUserWithEmailAndPassword(emailInput.value, passwordInput.value)
-  .then(cred => {
-    db.ref("users/"+cred.user.uid).set({nickname: nicknameInput.value, email: emailInput.value, admin:false});
-  }).catch(alert);
-}
+// Login
+loginBtn.addEventListener('click', () => {
+  if (!usernameInput.value) {
+    loginError.textContent = "Enter a username!";
+    return;
+  }
+  if (inviteInput.value !== INVITE_CODE) {
+    loginError.textContent = "Invalid invite code!";
+    return;
+  }
+  username = usernameInput.value;
+  loginDiv.classList.add('hidden');
+  chatDiv.classList.remove('hidden');
+  loadGroups();
+  renderMessages();
+});
 
-loginBtn.onclick = () => {
-  auth.signInWithEmailAndPassword(emailInput.value, passwordInput.value)
-  .catch(alert);
-}
-
-logoutBtn.onclick = () => { auth.signOut(); };
-
-// -------- Load Rooms --------
-function loadRooms(){
-  db.ref("rooms").once("value").then(snapshot => {
-    roomSelect.innerHTML = "";
-    snapshot.forEach(r => {
-      const opt = document.createElement("option");
-      opt.value = r.key;
-      opt.textContent = r.val().name;
-      roomSelect.appendChild(opt);
-    });
+// Load groups
+function loadGroups() {
+  groupSelect.innerHTML = "";
+  groups.forEach(g => {
+    const option = document.createElement('option');
+    option.value = g;
+    option.textContent = g;
+    groupSelect.appendChild(option);
+  });
+  groupSelect.value = currentGroup;
+  groupSelect.addEventListener('change', () => {
+    currentGroup = groupSelect.value;
+    renderMessages();
   });
 }
 
-// -------- Load Messages --------
-function loadMessages(room){
-  messagesDiv.innerHTML = "";
-  const msgsRef = db.ref("messages/"+room);
-  msgsRef.off(); // remove old listeners
-  msgsRef.on("child_added", snap => {
-    const msg = snap.val();
-    const div = document.createElement("div");
-    div.className = "message";
-    if(msg.admin) div.innerHTML = `<span class="admin">${msg.nickname}:</span> ${msg.text || ""}`;
-    else div.textContent = msg.nickname + ": " + (msg.text || "");
-    if(msg.file) div.innerHTML += `<br><a href="${msg.file}" target="_blank">[File]</a>`;
-    messagesDiv.appendChild(div);
-    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+// Send message
+sendBtn.addEventListener('click', () => {
+  const text = msgInput.value.trim();
+  if (!text && !fileInput.files[0]) return;
+
+  if (!messages[currentGroup]) messages[currentGroup] = [];
+  let msgObj = {user: username, text: text, file: null, time: Date.now()};
+  
+  if (fileInput.files[0]) {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      msgObj.file = e.target.result;
+      messages[currentGroup].push(msgObj);
+      localStorage.setItem('messages', JSON.stringify(messages));
+      renderMessages();
+      notifSound.play();
+    };
+    reader.readAsDataURL(fileInput.files[0]);
+  } else {
+    messages[currentGroup].push(msgObj);
+    localStorage.setItem('messages', JSON.stringify(messages));
+    renderMessages();
     notifSound.play();
-    // text-to-speech
-    if(msg.text) new SpeechSynthesisUtterance(msg.text).voice = speechSynthesis.getVoices()[0], speechSynthesis.speak(new SpeechSynthesisUtterance(msg.text));
+  }
+
+  msgInput.value = "";
+  fileInput.value = "";
+});
+
+// Render messages
+function renderMessages() {
+  messagesDiv.innerHTML = "";
+  if (!messages[currentGroup]) messages[currentGroup] = [];
+  messages[currentGroup].forEach(m => {
+    const div = document.createElement('div');
+    div.classList.add('message');
+    div.innerHTML = `<span class="group">${m.user}:</span> ${m.text || ''}`;
+    if (m.file) {
+      const link = document.createElement('a');
+      link.href = m.file;
+      link.textContent = " [File]";
+      link.download = "file";
+      div.appendChild(link);
+    }
+    messagesDiv.appendChild(div);
   });
+  messagesDiv.scrollTop = messagesDiv.scrollHeight;
 }
 
-// -------- Send Message --------
-sendBtn.onclick = () => {
-  const room = roomSelect.value;
-  const text = messageInput.value;
-  const file = fileInput.files[0];
-  if(!room) return alert("Select room");
-  if(file){
-    const ref = storage.ref("files/"+Date.now()+"_"+file.name);
-    ref.put(file).then(() => ref.getDownloadURL().then(url => {
-      db.ref("messages/"+room).push({nickname:nicknameInput.value,text:text||"",file:url,timestamp:Date.now()});
-    }));
-  } else {
-    db.ref("messages/"+room).push({nickname:nicknameInput.value,text:text||"",timestamp:Date.now()});
-  }
-  messageInput.value="";
-  fileInput.value="";
+// Text-to-speech
+ttsBtn.addEventListener('click', () => {
+  if (!messages[currentGroup] || messages[currentGroup].length === 0) return;
+  const lastMsg = messages[currentGroup][messages[currentGroup].length -1].text;
+  if (!lastMsg) return;
+  const utter = new SpeechSynthesisUtterance(lastMsg);
+  speechSynthesis.speak(utter);
+});
+
+// Add group feature (optional)
+const newGroup = prompt("Add a new group name (or cancel to skip):");
+if (newGroup && !groups.includes(newGroup)) {
+  groups.push(newGroup);
+  localStorage.setItem('groups', JSON.stringify(groups));
 }
-
-// -------- Room Change --------
-roomSelect.onchange = () => { loadMessages(roomSelect.value); }
-
-// -------- Auth State --------
-auth.onAuthStateChanged(user => {
-  if(user){
-    loginDiv.style.display="none";
-    chatDiv.style.display="block";
-    loadRooms();
-    // load first room messages
-    setTimeout(()=>{ if(roomSelect.value) loadMessages(roomSelect.value); },500);
-  } else {
-    loginDiv.style.display="block";
-    chatDiv.style.display="none";
-  }
-});
-
-// -------- Preload Demo Rooms & Messages --------
-db.ref("rooms").once("value").then(snap => {
-  if(!snap.exists()){
-    db.ref("rooms").set({general:{name:"General"},games:{name:"Games"}});
-    db.ref("messages/general").push({nickname:"Admin",text:"Welcome to the chat!",admin:true,timestamp:Date.now()});
-  }
-});
 </script>
 </body>
 </html>
