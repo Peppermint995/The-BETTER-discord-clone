@@ -3,160 +3,139 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Local Chat App</title>
+<title>Local Multi-Tab Chat</title>
 <style>
   body { margin: 0; font-family: Arial, sans-serif; background: #121212; color: #fff; }
-  .hidden { display: none; }
-  #login, #chat { padding: 20px; }
-  input, button { padding: 10px; margin: 5px 0; width: 100%; }
-  #messages { height: 300px; overflow-y: auto; border: 1px solid #555; padding: 10px; background: #1f1f1f; margin-bottom: 10px; }
-  .message { margin-bottom: 5px; }
-  .group { font-weight: bold; color: #00f; }
+  #login, #chat { display: none; padding: 20px; }
+  #messages { height: 300px; overflow-y: auto; border: 1px solid #555; padding: 10px; margin-bottom: 10px; background: #1f1f1f; }
+  input, select, button, textarea { padding: 8px; margin: 5px 0; width: 100%; border: none; border-radius: 4px; }
+  button { background: #0078ff; color: #fff; cursor: pointer; }
+  button:hover { background: #005fcc; }
+  .message { margin-bottom: 10px; }
+  .admin { background: linear-gradient(90deg, #ff0, #f0f); -webkit-background-clip: text; color: transparent; font-weight: bold; }
 </style>
 </head>
 <body>
 
 <div id="login">
   <h2>Login / Register</h2>
-  <input type="text" id="username" placeholder="Username">
-  <input type="password" id="inviteCode" placeholder="Invite Code">
-  <button id="loginBtn">Enter Chat</button>
-  <p id="loginError" style="color:red;"></p>
+  <input id="username" placeholder="Enter username">
+  <input id="invite" placeholder="Enter invite code">
+  <button id="loginBtn">Login</button>
 </div>
 
-<div id="chat" class="hidden">
-  <h2>Local Chat</h2>
+<div id="chat">
+  <h2>Chat Room</h2>
   <select id="groupSelect"></select>
+  <input id="newGroup" placeholder="New group name">
+  <button id="createGroup">Create Group</button>
   <div id="messages"></div>
-  <input type="text" id="msgInput" placeholder="Type a message">
+  <textarea id="msgInput" placeholder="Type a message"></textarea>
   <input type="file" id="fileInput">
   <button id="sendBtn">Send</button>
-  <button id="ttsBtn">Speak Last Message</button>
+  <label><input type="checkbox" id="tts"> Text-to-Speech</label>
 </div>
 
-<audio id="notifSound" src="https://www.myinstants.com/media/sounds/bleep.mp3" preload="auto"></audio>
-
 <script>
-const INVITE_CODE = "SCHOOL123"; // Example invite code
-let username = "";
-let currentGroup = "General";
+const INVITE_CODE = "SCHOOL123";
+let currentUser = "";
+let currentGroup = "";
+let ttsEnabled = false;
 
-// Local storage for messages and groups
-let messages = JSON.parse(localStorage.getItem('messages')) || {};
-let groups = JSON.parse(localStorage.getItem('groups')) || ["General"];
+// Show login first
+document.getElementById('login').style.display = 'block';
 
-// Elements
-const loginDiv = document.getElementById('login');
-const chatDiv = document.getElementById('chat');
-const usernameInput = document.getElementById('username');
-const inviteInput = document.getElementById('inviteCode');
-const loginBtn = document.getElementById('loginBtn');
-const loginError = document.getElementById('loginError');
-const messagesDiv = document.getElementById('messages');
-const msgInput = document.getElementById('msgInput');
-const sendBtn = document.getElementById('sendBtn');
-const groupSelect = document.getElementById('groupSelect');
-const fileInput = document.getElementById('fileInput');
-const ttsBtn = document.getElementById('ttsBtn');
-const notifSound = document.getElementById('notifSound');
-
-// Login
-loginBtn.addEventListener('click', () => {
-  if (!usernameInput.value) {
-    loginError.textContent = "Enter a username!";
-    return;
-  }
-  if (inviteInput.value !== INVITE_CODE) {
-    loginError.textContent = "Invalid invite code!";
-    return;
-  }
-  username = usernameInput.value;
-  loginDiv.classList.add('hidden');
-  chatDiv.classList.remove('hidden');
+document.getElementById('loginBtn').onclick = () => {
+  const username = document.getElementById('username').value.trim();
+  const invite = document.getElementById('invite').value.trim();
+  if (!username || invite !== INVITE_CODE) { alert("Invalid username or invite code!"); return; }
+  currentUser = username;
+  document.getElementById('login').style.display = 'none';
+  document.getElementById('chat').style.display = 'block';
   loadGroups();
-  renderMessages();
-});
+};
 
-// Load groups
 function loadGroups() {
-  groupSelect.innerHTML = "";
+  const groups = JSON.parse(localStorage.getItem('chatGroups') || '[]');
+  const select = document.getElementById('groupSelect');
+  select.innerHTML = "";
   groups.forEach(g => {
-    const option = document.createElement('option');
-    option.value = g;
-    option.textContent = g;
-    groupSelect.appendChild(option);
+    const opt = document.createElement('option');
+    opt.value = g;
+    opt.textContent = g;
+    select.appendChild(opt);
   });
-  groupSelect.value = currentGroup;
-  groupSelect.addEventListener('change', () => {
-    currentGroup = groupSelect.value;
-    renderMessages();
-  });
-}
-
-// Send message
-sendBtn.addEventListener('click', () => {
-  const text = msgInput.value.trim();
-  if (!text && !fileInput.files[0]) return;
-
-  if (!messages[currentGroup]) messages[currentGroup] = [];
-  let msgObj = {user: username, text: text, file: null, time: Date.now()};
-  
-  if (fileInput.files[0]) {
-    const reader = new FileReader();
-    reader.onload = function(e) {
-      msgObj.file = e.target.result;
-      messages[currentGroup].push(msgObj);
-      localStorage.setItem('messages', JSON.stringify(messages));
-      renderMessages();
-      notifSound.play();
-    };
-    reader.readAsDataURL(fileInput.files[0]);
-  } else {
-    messages[currentGroup].push(msgObj);
-    localStorage.setItem('messages', JSON.stringify(messages));
-    renderMessages();
-    notifSound.play();
+  if (groups.length > 0) {
+    currentGroup = groups[0];
+    loadMessages();
   }
+}
 
-  msgInput.value = "";
-  fileInput.value = "";
-});
+document.getElementById('createGroup').onclick = () => {
+  const name = document.getElementById('newGroup').value.trim();
+  if (!name) return;
+  let groups = JSON.parse(localStorage.getItem('chatGroups') || '[]');
+  if (!groups.includes(name)) { groups.push(name); localStorage.setItem('chatGroups', JSON.stringify(groups)); }
+  loadGroups();
+};
 
-// Render messages
-function renderMessages() {
-  messagesDiv.innerHTML = "";
-  if (!messages[currentGroup]) messages[currentGroup] = [];
-  messages[currentGroup].forEach(m => {
+document.getElementById('groupSelect').onchange = (e) => {
+  currentGroup = e.target.value;
+  loadMessages();
+};
+
+document.getElementById('sendBtn').onclick = sendMessage;
+
+document.getElementById('tts').onchange = (e) => { ttsEnabled = e.target.checked; };
+
+document.getElementById('fileInput').onchange = (e) => {
+  const file = e.target.files[0];
+  if (file) {
+    const reader = new FileReader();
+    reader.onload = () => { sendMessage(reader.result, file.name); };
+    reader.readAsDataURL(file);
+  }
+};
+
+function sendMessage(fileData, fileName) {
+  const text = fileData || document.getElementById('msgInput').value.trim();
+  if (!text) return;
+  const messages = JSON.parse(localStorage.getItem('chatMessages') || '[]');
+  messages.push({ user: currentUser, group: currentGroup, text, fileName, timestamp: Date.now() });
+  localStorage.setItem('chatMessages', JSON.stringify(messages));
+  document.getElementById('msgInput').value = '';
+  loadMessages();
+  if (ttsEnabled && !fileData) speechSynthesis.speak(new SpeechSynthesisUtterance(text));
+}
+
+function loadMessages() {
+  const messages = JSON.parse(localStorage.getItem('chatMessages') || '[]')
+    .filter(m => m.group === currentGroup);
+  const container = document.getElementById('messages');
+  container.innerHTML = '';
+  messages.forEach(m => {
     const div = document.createElement('div');
-    div.classList.add('message');
-    div.innerHTML = `<span class="group">${m.user}:</span> ${m.text || ''}`;
-    if (m.file) {
-      const link = document.createElement('a');
-      link.href = m.file;
-      link.textContent = " [File]";
-      link.download = "file";
-      div.appendChild(link);
+    div.className = 'message';
+    div.innerHTML = `<strong class="${m.user.toLowerCase() === 'admin' ? 'admin' : ''}">${m.user}:</strong> ${m.text}`;
+    if (m.fileName) {
+      const a = document.createElement('a');
+      a.href = m.text;
+      a.download = m.fileName;
+      a.textContent = `[Download ${m.fileName}]`;
+      div.appendChild(document.createElement('br'));
+      div.appendChild(a);
     }
-    messagesDiv.appendChild(div);
+    container.appendChild(div);
   });
-  messagesDiv.scrollTop = messagesDiv.scrollHeight;
+  container.scrollTop = container.scrollHeight;
 }
 
-// Text-to-speech
-ttsBtn.addEventListener('click', () => {
-  if (!messages[currentGroup] || messages[currentGroup].length === 0) return;
-  const lastMsg = messages[currentGroup][messages[currentGroup].length -1].text;
-  if (!lastMsg) return;
-  const utter = new SpeechSynthesisUtterance(lastMsg);
-  speechSynthesis.speak(utter);
+// Sync across tabs
+window.addEventListener('storage', (e) => {
+  if (e.key === 'chatMessages') loadMessages();
+  if (e.key === 'chatGroups') loadGroups();
 });
-
-// Add group feature (optional)
-const newGroup = prompt("Add a new group name (or cancel to skip):");
-if (newGroup && !groups.includes(newGroup)) {
-  groups.push(newGroup);
-  localStorage.setItem('groups', JSON.stringify(groups));
-}
 </script>
+
 </body>
 </html>
