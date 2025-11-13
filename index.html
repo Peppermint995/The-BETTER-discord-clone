@@ -3,262 +3,221 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>School Chat</title>
+<title>Advanced Firebase Chat</title>
 <style>
-:root {
-  --bg: #121212;
-  --card: #1f1f1f;
-  --muted: rgba(255,255,255,0.7);
-  --accent: #0078ff;
-}
-body {
-  margin: 0;
-  font-family: Arial, sans-serif;
-  background: var(--bg);
-  color: white;
-  display: flex;
-  height: 100vh;
-  overflow: hidden;
-}
-#sidebar {
-  width: 200px;
-  background: var(--card);
-  display: flex;
-  flex-direction: column;
-  padding: 10px;
-}
-#sidebar h2 { margin:0 0 10px 0; font-size:18px; text-align:center; }
-#groupList { flex:1; overflow-y:auto; }
-#groupList div {
-  padding:8px; cursor:pointer; border-radius:5px; word-break: break-word;
-}
-#groupList div.active { background: var(--accent); color:white; }
-#main { flex:1; display:flex; flex-direction:column; }
-#chatBox { flex:1; overflow-y:auto; padding:10px; word-wrap: break-word; }
-.message {
-  margin-bottom:10px; line-height:1.4; opacity:0; animation:fadeIn 0.5s forwards;
-  padding:4px 6px; border-radius:5px;
-}
-.message.new { background: rgba(0,120,255,0.2); transition: background 2s ease; }
-.user { font-weight:bold; }
-.admin {
-  background: linear-gradient(270deg,#ff6ec4,#7873f5,#42e695,#ff6ec4);
-  background-size:600% 600%;
-  -webkit-background-clip:text;
-  -webkit-text-fill-color:transparent;
-  animation: gradient 6s ease infinite;
-}
-.timestamp { color:rgba(255,255,255,0.5); font-size:0.8em; margin-left:5px; }
-.bold { font-weight:bold; }
-.italic { font-style:italic; }
-.color-red { color:red; }
-.color-green { color:lime; }
-.color-blue { color:cyan; }
-.animated { animation: gradient 6s ease infinite; -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
-@keyframes gradient {
-  0% {background-position:0% 50%;} 50% {background-position:100% 50%;} 100% {background-position:0% 50%;}
-}
-@keyframes fadeIn { to { opacity:1; } }
-#inputBox { display:flex; padding:10px; background:var(--card); }
-#msgInput { flex:1; padding:8px; border:none; border-radius:5px; margin-right:5px; word-wrap: break-word; }
-#sendBtn, #clearBtn { padding:8px 12px; border:none; border-radius:5px; background: var(--accent); color:white; cursor:pointer; margin-left:3px; }
-#loginBox {
-  position:absolute; top:0; left:0; width:100%; height:100%;
-  display:flex; justify-content:center; align-items:center;
-  background: rgba(0,0,0,0.85); flex-direction: column;
-}
-#loginBox input { margin:5px 0; padding:8px; width:200px; border-radius:5px; border:none; }
-#loginBox button { padding:8px 12px; border:none; border-radius:5px; background: var(--accent); color:white; cursor:pointer; margin-top:5px; }
-#notifControl { margin-top:10px; text-align:center; }
-#notifControl input { width:100%; }
-#ttsToggle { margin-top:10px; text-align:center; cursor:pointer; padding:5px; background:#333; border-radius:5px; }
-#adminPanel { margin-top:10px; display:none; }
-@media(max-width:600px){
-  #sidebar { width:120px; }
-  #groupList div { font-size:12px; padding:6px; }
-  #msgInput { width:100px; }
-}
+  body {
+    margin:0;
+    font-family: Arial, sans-serif;
+    background: #121212;
+    color: #fff;
+    display:flex;
+    height:100vh;
+  }
+  #sidebar {
+    width:250px;
+    background:#1f1f1f;
+    padding:10px;
+    display:flex;
+    flex-direction:column;
+    overflow-y:auto;
+  }
+  #chat-container {
+    flex:1;
+    display:flex;
+    flex-direction:column;
+    background:#121212;
+  }
+  #messages {
+    flex:1;
+    padding:10px;
+    overflow-y:auto;
+    word-wrap: break-word;
+  }
+  #input-container {
+    display:flex;
+  }
+  #message-input {
+    flex:1;
+    padding:10px;
+    border:none;
+    outline:none;
+    font-size:16px;
+  }
+  button {
+    padding:10px;
+    font-size:16px;
+    cursor:pointer;
+    background:#0078ff;
+    color:white;
+    border:none;
+  }
+  .admin {
+    font-weight:bold;
+    background: linear-gradient(90deg, red, yellow, green, cyan, blue, magenta);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: gradientAnim 5s linear infinite;
+  }
+  @keyframes gradientAnim {
+    0% { background-position:0% 50%; }
+    50% { background-position:100% 50%; }
+    100% { background-position:0% 50%; }
+  }
+  .message {
+    margin-bottom:5px;
+  }
+  .bold { font-weight:bold; }
+  .italic { font-style:italic; }
 </style>
 </head>
 <body>
-
 <div id="sidebar">
-  <h2>Groups</h2>
-  <div id="groupList"></div>
-  <div id="notifControl">
-    <label>Notification Sound:</label>
-    <input type="file" id="notifUpload" accept="audio/*">
-  </div>
-  <div id="ttsToggle">TTS: On</div>
-  <div id="adminPanel">
-    <button id="adminClearBtn">Clear Chat (Admin)</button>
-    <button id="generateInviteBtn">Generate Invite Code</button>
-    <div id="newInviteCode"></div>
-    <div style="margin-top:5px;">
-      <label>Admin Effects:</label>
-      <select id="effectSelect">
-        <option value="">None</option>
-        <option value="bold">Bold</option>
-        <option value="italic">Italic</option>
-        <option value="color-red">Red</option>
-        <option value="color-green">Green</option>
-        <option value="color-blue">Blue</option>
-        <option value="animated">Animated</option>
-      </select>
-    </div>
+  <h3>Groups</h3>
+  <div id="groups"></div>
+  <button id="create-group-btn">Create Group</button>
+  <hr>
+  <h3>Broadcasts (Admins Only)</h3>
+  <div id="broadcasts"></div>
+  <button id="send-broadcast-btn">Send Broadcast</button>
+</div>
+<div id="chat-container">
+  <div id="messages"></div>
+  <div id="input-container">
+    <input type="text" id="message-input" placeholder="Type a message">
+    <button id="send-btn">Send</button>
   </div>
 </div>
 
-<div id="main">
-  <div id="chatBox"></div>
-  <div id="inputBox">
-    <input type="text" id="msgInput" placeholder="Type a message..." />
-    <button id="sendBtn">Send</button>
-    <button id="clearBtn">Clear Chat</button>
-    <button id="broadcastBtn">Broadcast</button>
-  </div>
-</div>
-
-<div id="loginBox">
-  <h2>Login/Register</h2>
-  <input type="email" id="emailInput" placeholder="Email">
-  <input type="text" id="inviteCodeInput" placeholder="Invite Code">
-  <button id="loginBtn">Next</button>
-</div>
-
-<audio id="notifSound" src="https://www.soundjay.com/buttons/sounds/button-3.mp3"></audio>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 
 <script>
-let currentUser = '';
-let currentName = '';
-let currentGroup = '';
-const admins = ['uyiog_aghay195@ahschools.us'];
-let ttsEnabled = true;
-let notifSound = document.getElementById('notifSound');
-let inviteCodes = ['SCHOOL123'];
+const firebaseConfig = {
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_AUTH_DOMAIN",
+  projectId: "YOUR_PROJECT_ID",
+  databaseURL: "YOUR_DATABASE_URL",
+  storageBucket: "YOUR_STORAGE_BUCKET",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId: "YOUR_APP_ID"
+};
+firebase.initializeApp(firebaseConfig);
+
+const auth = firebase.auth();
+const db = firebase.database();
+
+let currentUser = null;
+let currentGroup = null;
+
+// Persistent login
+auth.onAuthStateChanged(user => {
+  if(user){
+    currentUser = user;
+    if(!user.displayName){
+      const name = prompt("Choose a display name:");
+      user.updateProfile({displayName:name});
+    }
+    initChat();
+  } else {
+    const email = prompt("Enter your email:");
+    const password = prompt("Enter a password:");
+    auth.signInWithEmailAndPassword(email,password)
+      .catch(() => auth.createUserWithEmailAndPassword(email,password));
+  }
+});
+
+function initChat(){
+  loadGroups();
+  loadMessages();
+  loadBroadcasts();
+}
 
 // Groups
-const groups = ['General','Math','Science','Fun'];
-const groupList = document.getElementById('groupList');
-groups.forEach(g => {
-  const div = document.createElement('div');
-  div.textContent = g;
-  div.onclick = () => { currentGroup = g; document.querySelectorAll('#groupList div').forEach(d=>d.classList.remove('active')); div.classList.add('active'); loadMessages(); };
-  groupList.appendChild(div);
-});
-currentGroup = groups[0];
-groupList.children[0].classList.add('active');
-
-// Check persistent login
-if(localStorage.getItem('chatUser')){
-  currentUser = localStorage.getItem('chatUser');
-  currentName = localStorage.getItem('chatName');
-  document.getElementById('loginBox').style.display='none';
-  if(admins.includes(currentUser)) document.getElementById('adminPanel').style.display='block';
-  loadMessages();
-}
-
-// Login/Register flow
-document.getElementById('loginBtn').onclick = () => {
-  const email = document.getElementById('emailInput').value.trim();
-  const code = document.getElementById('inviteCodeInput').value.trim();
-  if(!email || !inviteCodes.includes(code)) { alert('Invalid email or invite code'); return; }
-  currentUser = email;
-  const name = prompt("Enter your display name:");
-  if(!name) { alert('Display name required'); return; }
-  currentName = name;
-  document.getElementById('loginBox').style.display='none';
-  localStorage.setItem('chatUser',currentUser);
-  localStorage.setItem('chatName',currentName);
-  if(admins.includes(currentUser)) document.getElementById('adminPanel').style.display='block';
-  loadMessages();
-};
-
-// Send message function
-function sendMessage(text,isBroadcast=false){
-  if(!text) return;
-  const messages = JSON.parse(localStorage.getItem('chatMessages')||'[]');
-  const timestamp = new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
-  const effect = (admins.includes(currentUser)) ? document.getElementById('effectSelect').value : '';
-  messages.push({user:currentUser,name:currentName,group:isBroadcast?'Broadcast':currentGroup,text,effect,timestamp});
-  localStorage.setItem('chatMessages',JSON.stringify(messages));
-  loadMessages(true);
-  if(ttsEnabled){
-    const utter = new SpeechSynthesisUtterance(text);
-    speechSynthesis.cancel();
-    speechSynthesis.speak(utter);
-  }
-  if(currentUser!==localStorage.getItem('lastUser')) notifSound.play().catch(e=>console.log(e));
-  localStorage.setItem('lastUser',currentUser);
-}
-
-// Load messages
-function loadMessages(highlight=false){
-  const messages = JSON.parse(localStorage.getItem('chatMessages')||'[]');
-  const chatBox = document.getElementById('chatBox');
-  chatBox.innerHTML='';
-  messages.forEach(msg=>{
-    if(msg.group!==currentGroup && msg.group!=='Broadcast') return;
-    const div=document.createElement('div');
-    div.className='message';
-    if(highlight) div.classList.add('new');
-
-    const userSpan=document.createElement('span');
-    userSpan.textContent=msg.name;
-    if(admins.includes(msg.user)) userSpan.className='user admin';
-    else userSpan.className='user';
-    
-    const textSpan=document.createElement('span');
-    textSpan.textContent=': '+msg.text;
-    if(msg.effect) textSpan.className=msg.effect;
-
-    const timeSpan=document.createElement('span');
-    timeSpan.className='timestamp';
-    timeSpan.textContent=` (${msg.timestamp})`;
-
-    div.appendChild(userSpan);
-    div.appendChild(textSpan);
-    div.appendChild(timeSpan);
-    chatBox.appendChild(div);
-
-    if(div.classList.contains('new')) setTimeout(()=>{div.classList.remove('new');},2000);
+function loadGroups(){
+  db.ref("groups").on("value", snapshot => {
+    const groupsDiv = document.getElementById("groups");
+    groupsDiv.innerHTML = "";
+    snapshot.forEach(g => {
+      const btn = document.createElement("button");
+      btn.textContent = g.key;
+      btn.onclick = () => { currentGroup = g.key; loadMessages(); };
+      groupsDiv.appendChild(btn);
+    });
   });
-  chatBox.scrollTop=chatBox.scrollHeight;
 }
 
-// Send button
-document.getElementById('sendBtn').onclick = () => sendMessage(document.getElementById('msgInput').value);
-
-// Broadcast button
-document.getElementById('broadcastBtn').onclick = () => {
-  if(admins.includes(currentUser)){
-    const text = document.getElementById('msgInput').value;
-    if(!text) return;
-    sendMessage(text,true);
-    document.getElementById('msgInput').value='';
-  } else alert('Only admins can broadcast!');
+document.getElementById("create-group-btn").onclick = () => {
+  if(!currentUser.isAdmin) return;
+  const group = prompt("Enter group name:");
+  if(group) db.ref("groups/"+group).set({createdBy:currentUser.email});
 };
 
-// Clear chat
-document.getElementById('clearBtn').onclick = () => { if(confirm('Clear chat view?')) document.getElementById('chatBox').innerHTML=''; };
-// Admin clear
-document.getElementById('adminClearBtn').onclick = () => { if(confirm('Admin clear all messages?')){ localStorage.setItem('chatMessages','[]'); loadMessages(); } };
-// Generate invite
-document.getElementById('generateInviteBtn').onclick = () => { const code='INV'+Math.floor(Math.random()*9000+1000); inviteCodes.push(code); document.getElementById('newInviteCode').textContent='New code: '+code; };
+// Messages
+function loadMessages(){
+  if(!currentGroup) return;
+  db.ref("messages/"+currentGroup).on("child_added", snapshot => {
+    const msg = snapshot.val();
+    displayMessage(msg);
+  });
+}
 
-// Custom notification
-document.getElementById('notifUpload').addEventListener('change',(e)=>{ const f=e.target.files[0]; if(f){ notifSound.src=URL.createObjectURL(f); notifSound.load(); }});
-// TTS toggle
-document.getElementById('ttsToggle').onclick = ()=>{ ttsEnabled=!ttsEnabled; document.getElementById('ttsToggle').textContent=`TTS: ${ttsEnabled?'On':'Off'}`; };
+function displayMessage(msg){
+  const div = document.createElement("div");
+  div.className = "message";
+  let content = msg.text;
+  if(msg.bold) content = `<span class="bold">${content}</span>`;
+  if(msg.italic) content = `<span class="italic">${content}</span>`;
+  if(msg.color) content = `<span style="color:${msg.color}">${content}</span>`;
+  if(msg.admin) content = `<span class="admin">${msg.sender}</span>: ${content}`;
+  else content = `<strong>${msg.sender}</strong>: ${content}`;
+  div.innerHTML = content;
+  document.getElementById("messages").appendChild(div);
+  div.scrollIntoView();
+  if(msg.tts) speak(msg.text);
+}
 
-// Enter key sends message
-document.getElementById('msgInput').addEventListener('keypress',e=>{
-  if(e.key==='Enter'){ sendMessage(document.getElementById('msgInput').value); document.getElementById('msgInput').value=''; }
+function speak(text){
+  const utter = new SpeechSynthesisUtterance(text);
+  speechSynthesis.speak(utter);
+}
+
+document.getElementById("send-btn").onclick = sendMessage;
+document.getElementById("message-input").addEventListener("keypress", e => {
+  if(e.key==="Enter") sendMessage();
 });
 
-// Multi-tab sync
-window.addEventListener('storage', loadMessages);
+function sendMessage(){
+  const input = document.getElementById("message-input");
+  if(!input.value) return;
+  const text = input.value;
+  const msgObj = {
+    sender: currentUser.displayName || currentUser.email,
+    text: text,
+    admin: currentUser.email.endsWith("@ahschools.us"), // simple admin check
+    bold:false, italic:false, color:null, tts:false
+  };
+  db.ref("messages/"+(currentGroup||"general")).push(msgObj);
+  input.value="";
+}
 
+// Broadcasts
+function loadBroadcasts(){
+  db.ref("broadcasts").on("child_added", snapshot => {
+    const msg = snapshot.val();
+    const div = document.createElement("div");
+    div.innerHTML = `<strong>${msg.sender}</strong>: ${msg.text}`;
+    document.getElementById("broadcasts").appendChild(div);
+    speak(msg.text);
+  });
+}
+
+document.getElementById("send-broadcast-btn").onclick = () => {
+  if(!currentUser.email.endsWith("@ahschools.us")) return alert("Admins only");
+  const text = prompt("Enter broadcast message:");
+  db.ref("broadcasts").push({sender:currentUser.displayName,text});
+};
 </script>
 </body>
 </html>
+
