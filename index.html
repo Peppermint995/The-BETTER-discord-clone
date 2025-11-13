@@ -3,16 +3,30 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Local Multi-Tab Chat</title>
+<title>School Chat</title>
 <style>
-  body { margin: 0; font-family: Arial, sans-serif; background: #121212; color: #fff; }
-  #login, #chat { display: none; padding: 20px; }
-  #messages { height: 300px; overflow-y: auto; border: 1px solid #555; padding: 10px; margin-bottom: 10px; background: #1f1f1f; }
-  input, select, button, textarea { padding: 8px; margin: 5px 0; width: 100%; border: none; border-radius: 4px; }
-  button { background: #0078ff; color: #fff; cursor: pointer; }
-  button:hover { background: #005fcc; }
+  body { margin: 0; font-family: Arial, sans-serif; background: #121212; color: #fff; display: flex; height: 100vh; overflow: hidden; }
+  #login { display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; }
+  #login input, #login button { padding: 10px; margin: 5px; width: 250px; border-radius: 5px; border: none; }
+  #login button { background: #0078ff; color: #fff; cursor: pointer; }
+  #chat { display: none; flex: 1; flex-direction: row; height: 100%; }
+  #sidebar { width: 200px; background: #1f1f1f; display: flex; flex-direction: column; padding: 10px; overflow-y: auto; }
+  #sidebar h3 { margin-top: 0; text-align: center; }
+  #sidebar button { margin-bottom: 5px; background: #0078ff; color: #fff; border-radius: 5px; cursor: pointer; border: none; padding: 5px; }
+  #sidebar input { margin-bottom: 5px; padding: 5px; border-radius: 5px; border: none; }
+  #chatArea { flex: 1; display: flex; flex-direction: column; }
+  #messages { flex: 1; overflow-y: auto; padding: 10px; background: #1a1a1a; }
   .message { margin-bottom: 10px; word-break: break-word; }
-  .admin { background: linear-gradient(90deg, #ff0, #f0f); -webkit-background-clip: text; color: transparent; font-weight: bold; }
+  .message .user { font-weight: bold; }
+  .admin { background: linear-gradient(90deg,#ff0,#f0f); -webkit-background-clip: text; color: transparent; font-weight: bold; }
+  #inputArea { display: flex; padding: 10px; gap: 5px; background: #1f1f1f; }
+  #inputArea input[type="text"], #inputArea textarea { flex: 1; padding: 10px; border-radius: 5px; border: none; }
+  #inputArea button { background: #0078ff; color: #fff; border: none; border-radius: 5px; padding: 10px; cursor: pointer; }
+  @media (max-width: 600px) {
+    #chat { flex-direction: column; }
+    #sidebar { width: 100%; flex-direction: row; overflow-x: auto; }
+    #sidebar button { flex: 1; }
+  }
 </style>
 </head>
 <body>
@@ -25,16 +39,24 @@
 </div>
 
 <div id="chat">
-  <h2>Chat Room</h2>
-  <select id="groupSelect"></select>
-  <input id="newGroup" placeholder="New group name">
-  <button id="createGroup">Create Group</button>
-  <div id="messages"></div>
-  <textarea id="msgInput" placeholder="Type a message"></textarea>
-  <input type="file" id="fileInput">
-  <button id="sendBtn">Send</button>
-  <label><input type="checkbox" id="tts"> Text-to-Speech</label>
+  <div id="sidebar">
+    <h3>Groups</h3>
+    <input id="newGroup" placeholder="New group name">
+    <button id="createGroup">Create Group</button>
+    <div id="groupList"></div>
+  </div>
+  <div id="chatArea">
+    <div id="messages"></div>
+    <div id="inputArea">
+      <textarea id="msgInput" placeholder="Type a message"></textarea>
+      <input type="file" id="fileInput">
+      <button id="sendBtn">Send</button>
+      <label><input type="checkbox" id="tts"> TTS</label>
+    </div>
+  </div>
 </div>
+
+<audio id="notifySound" src="https://www.soundjay.com/buttons/sounds/button-3.mp3"></audio>
 
 <script>
 const INVITE_CODE = "SCHOOL123";
@@ -43,32 +65,33 @@ let currentUser = "";
 let currentGroup = "";
 let ttsEnabled = false;
 
-document.getElementById('login').style.display = 'block';
+const loginDiv = document.getElementById('login');
+const chatDiv = document.getElementById('chat');
+const messagesDiv = document.getElementById('messages');
+const groupListDiv = document.getElementById('groupList');
+const notifySound = document.getElementById('notifySound');
 
 document.getElementById('loginBtn').onclick = () => {
   const username = document.getElementById('username').value.trim();
   const invite = document.getElementById('invite').value.trim();
   if (!username || invite !== INVITE_CODE) { alert("Invalid username or invite code!"); return; }
   currentUser = username;
-  document.getElementById('login').style.display = 'none';
-  document.getElementById('chat').style.display = 'block';
+  loginDiv.style.display = 'none';
+  chatDiv.style.display = 'flex';
   loadGroups();
 };
 
 function loadGroups() {
   const groups = JSON.parse(localStorage.getItem('chatGroups') || '[]');
-  const select = document.getElementById('groupSelect');
-  select.innerHTML = "";
+  groupListDiv.innerHTML = '';
   groups.forEach(g => {
-    const opt = document.createElement('option');
-    opt.value = g;
-    opt.textContent = g;
-    select.appendChild(opt);
+    const btn = document.createElement('button');
+    btn.textContent = g;
+    btn.onclick = () => { currentGroup = g; loadMessages(); };
+    groupListDiv.appendChild(btn);
   });
-  if (groups.length > 0) {
-    currentGroup = groups[0];
-    loadMessages();
-  }
+  if (!currentGroup && groups.length > 0) currentGroup = groups[0];
+  loadMessages();
 }
 
 document.getElementById('createGroup').onclick = () => {
@@ -76,30 +99,25 @@ document.getElementById('createGroup').onclick = () => {
   if (!name) return;
   let groups = JSON.parse(localStorage.getItem('chatGroups') || '[]');
   if (!groups.includes(name)) { groups.push(name); localStorage.setItem('chatGroups', JSON.stringify(groups)); }
+  document.getElementById('newGroup').value = '';
   loadGroups();
 };
 
-document.getElementById('groupSelect').onchange = (e) => {
-  currentGroup = e.target.value;
-  loadMessages();
-};
-
 document.getElementById('sendBtn').onclick = sendMessage;
+document.getElementById('tts').onchange = e => ttsEnabled = e.target.checked;
 
-document.getElementById('tts').onchange = (e) => { ttsEnabled = e.target.checked; };
-
-document.getElementById('fileInput').onchange = (e) => {
+document.getElementById('fileInput').onchange = e => {
   const file = e.target.files[0];
   if (file) {
     const reader = new FileReader();
-    reader.onload = () => { sendMessage(reader.result, file.name); };
+    reader.onload = () => sendMessage(reader.result, file.name);
     reader.readAsDataURL(file);
   }
 };
 
 function sendMessage(fileData, fileName) {
   const text = fileData || document.getElementById('msgInput').value.trim();
-  if (!text) return;
+  if (!text || !currentGroup) return;
   const messages = JSON.parse(localStorage.getItem('chatMessages') || '[]');
   messages.push({ user: currentUser, group: currentGroup, text, fileName, timestamp: Date.now() });
   localStorage.setItem('chatMessages', JSON.stringify(messages));
@@ -109,15 +127,15 @@ function sendMessage(fileData, fileName) {
 }
 
 function loadMessages() {
+  if (!currentGroup) return;
   const messages = JSON.parse(localStorage.getItem('chatMessages') || '[]')
     .filter(m => m.group === currentGroup);
-  const container = document.getElementById('messages');
-  container.innerHTML = '';
+  messagesDiv.innerHTML = '';
   messages.forEach(m => {
     const div = document.createElement('div');
     div.className = 'message';
     const isAdmin = m.user.toLowerCase() === ADMIN_USER.toLowerCase();
-    div.innerHTML = `<strong class="${isAdmin ? 'admin' : ''}">${m.user}:</strong> ${m.text}`;
+    div.innerHTML = `<span class="user ${isAdmin ? 'admin' : ''}">${m.user}:</span> ${m.text}`;
     if (m.fileName) {
       const a = document.createElement('a');
       a.href = m.text;
@@ -126,13 +144,14 @@ function loadMessages() {
       div.appendChild(document.createElement('br'));
       div.appendChild(a);
     }
-    container.appendChild(div);
+    messagesDiv.appendChild(div);
   });
-  container.scrollTop = container.scrollHeight;
+  messagesDiv.scrollTop = messagesDiv.scrollHeight;
+  if (messages.length > 0) notifySound.play();
 }
 
 // Sync across tabs
-window.addEventListener('storage', (e) => {
+window.addEventListener('storage', e => {
   if (e.key === 'chatMessages') loadMessages();
   if (e.key === 'chatGroups') loadGroups();
 });
