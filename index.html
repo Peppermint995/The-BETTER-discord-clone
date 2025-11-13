@@ -61,6 +61,8 @@
   .message {
     margin-bottom: 10px;
     line-height: 1.4;
+    opacity: 0;
+    animation: fadeIn 0.5s forwards;
   }
   .user {
     font-weight: bold;
@@ -72,10 +74,18 @@
     -webkit-text-fill-color: transparent;
     animation: gradient 6s ease infinite;
   }
+  .timestamp {
+    color: var(--muted);
+    font-size: 0.8em;
+    margin-left: 5px;
+  }
   @keyframes gradient {
     0% {background-position:0% 50%;}
     50% {background-position:100% 50%;}
     100% {background-position:0% 50%;}
+  }
+  @keyframes fadeIn {
+    to { opacity: 1; }
   }
   #inputBox {
     display: flex;
@@ -90,13 +100,14 @@
     margin-right: 5px;
     word-wrap: break-word;
   }
-  #sendBtn {
+  #sendBtn, #clearBtn {
     padding: 8px 12px;
     border: none;
     border-radius: 5px;
     background: var(--accent);
     color: white;
     cursor: pointer;
+    margin-left: 3px;
   }
   #loginBox {
     position: absolute;
@@ -163,6 +174,7 @@
   <div id="inputBox">
     <input type="text" id="msgInput" placeholder="Type a message..." />
     <button id="sendBtn">Send</button>
+    <button id="clearBtn">Clear Chat</button>
   </div>
 </div>
 
@@ -219,10 +231,19 @@ document.getElementById('sendBtn').onclick = () => {
   input.value='';
 };
 
+// Clear chat
+document.getElementById('clearBtn').onclick = () => {
+  if(confirm('Are you sure you want to clear the chat?')){
+    localStorage.setItem('chatMessages','[]');
+    loadMessages();
+  }
+};
+
 function sendMessage(text) {
   if(!text || !currentGroup) return;
   const messages = JSON.parse(localStorage.getItem('chatMessages')||'[]');
-  messages.push({user:currentUser,group:currentGroup,text});
+  const timestamp = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+  messages.push({user:currentUser,group:currentGroup,text,timestamp});
   localStorage.setItem('chatMessages',JSON.stringify(messages));
   loadMessages();
 
@@ -256,8 +277,12 @@ function loadMessages() {
     const textSpan = document.createElement('span');
     textSpan.textContent = ': '+msg.text;
     textSpan.className='text';
+    const timeSpan = document.createElement('span');
+    timeSpan.className='timestamp';
+    timeSpan.textContent = ` (${msg.timestamp})`;
     div.appendChild(userSpan);
     div.appendChild(textSpan);
+    div.appendChild(timeSpan);
     chatBox.appendChild(div);
   });
   chatBox.scrollTop = chatBox.scrollHeight;
