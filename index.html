@@ -1,600 +1,264 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Firebase Chat with Admin Panel</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Realtime Chat App with Admin Controls</title>
 <style>
-  :root{
-    --bg:#0f1724;
-    --card:#0b1220;
-    --muted:#9aa4b2;
-    --accent:#6ee7b7;
+  :root {
+    --bg: #121212;
+    --card: #1f1f1f;
+    --muted: rgba(255,255,255,0.7);
+    --accent: #00bfff;
   }
-  *{box-sizing:border-box;font-family:Inter,ui-sans-serif,system-ui,Segoe UI,Roboto,"Helvetica Neue",Arial}
-  body{margin:0;background:linear-gradient(180deg,#071126 0%, #081424 100%);color:#e6eef6;min-height:100vh;display:flex;align-items:stretch}
-  .app{width:100%;height:100vh;display:grid;grid-template-columns:280px 1fr;gap:12px;padding:12px}
-  .panel{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));border-radius:12px;padding:12px;overflow:auto;box-shadow:0 6px 18px rgba(2,6,23,0.6)}
-  .sidebar{display:flex;flex-direction:column;gap:12px}
-  .brand{font-weight:700;font-size:18px;display:flex;justify-content:space-between;align-items:center}
-  .groups{display:flex;flex-direction:column;gap:8px}
-  .group{padding:8px;border-radius:8px;cursor:pointer;color:var(--muted);display:flex;justify-content:space-between;align-items:center}
-  .group.active{background:rgba(255,255,255,0.03);color:#fff}
-  .main{display:flex;flex-direction:column;height:100%}
-  .messages{flex:1;padding:12px;overflow:auto;display:flex;flex-direction:column;gap:10px}
-  .msg{max-width:75%;padding:10px;border-radius:10px;background:rgba(255,255,255,0.03);backdrop-filter:blur(2px)}
-  .msg.me{align-self:flex-end;background:linear-gradient(135deg, rgba(110,231,183,0.08), rgba(99,102,241,0.06))}
-  .meta{font-size:12px;color:var(--muted);margin-bottom:6px;display:flex;gap:8px;align-items:center}
-  .author.admin{
-    background:linear-gradient(90deg,#f97316,#ef4444,#c084fc);
-    -webkit-background-clip:text;
-    background-clip:text;
-    color:transparent;
-    font-weight:700;
+
+  body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background: var(--bg);
+    color: white;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
   }
-  .composer{display:flex;gap:8px;padding:12px;border-top:1px solid rgba(255,255,255,0.03);align-items:center}
-  input[type="text"],input[type="email"],input[type="password"],select,textarea {
-    width:100%;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit;
+
+  header {
+    padding: 10px;
+    background: var(--card);
+    text-align: center;
+    font-size: 1.5em;
+    font-weight: bold;
   }
-  button{background:var(--accent);border:none;padding:8px 12px;border-radius:8px;cursor:pointer;color:#052018;font-weight:600}
-  .small{font-size:13px;color:var(--muted)}
-  .users-list{display:flex;flex-direction:column;gap:8px}
-  .user-row{display:flex;justify-content:space-between;align-items:center;padding:6px;border-radius:8px}
-  .admin-badge{font-size:12px;padding:4px 8px;border-radius:999px;background:linear-gradient(90deg,#ff7a18,#ff4b2b);color:#050505;font-weight:700}
-  .file-preview{font-size:12px;color:var(--muted);margin-top:6px}
-  .topbar{display:flex;gap:8px;align-items:center;justify-content:space-between}
-  .right-controls{display:flex;gap:8px;align-items:center}
-  .hidden{display:none}
-  .notice{font-size:12px;color:#a7b0bb}
-  .flex{display:flex;gap:8px}
-  .invite-code{font-weight:700;color:#cbd5e1}
-  /* responsive */
-  @media(max-width:900px){
-    .app{grid-template-columns:1fr}
-    .sidebar{order:2}
+
+  #login, #chat {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
   }
+
+  input, button, select {
+    padding: 8px;
+    margin: 5px;
+    border-radius: 5px;
+    border: none;
+  }
+
+  #messages {
+    flex: 1;
+    width: 90%;
+    overflow-y: auto;
+    margin: 10px 0;
+    border: 1px solid var(--muted);
+    padding: 10px;
+    border-radius: 5px;
+    background: #1a1a1a;
+  }
+
+  .message {
+    margin-bottom: 8px;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .username {
+    font-weight: bold;
+  }
+
+  .file-link {
+    color: var(--accent);
+    text-decoration: underline;
+    cursor: pointer;
+  }
+
+  /* Admin name gradient animation */
+  @keyframes gradientShift {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+
 </style>
 </head>
 <body>
-<div class="app">
-  <!-- SIDEBAR -->
-  <div class="panel sidebar" id="sidebar">
-    <div class="brand">
-      <div>🧁 Candy Chat</div>
-      <div id="auth-buttons"></div>
-    </div>
 
-    <div>
-      <div class="small">Your user:</div>
-      <div id="currentUserName" class="small notice">Not signed in</div>
-    </div>
+<header>Realtime Chat App - Admin Controls</header>
 
-    <div>
-      <div style="display:flex;justify-content:space-between;align-items:center">
-        <div class="small">Groups</div>
-        <button id="createGroupBtn" title="Create new group">+ group</button>
-      </div>
-      <div class="groups" id="groupsList"></div>
-    </div>
+<div id="login">
+  <input type="text" id="email" placeholder="Email">
+  <input type="text" id="username" placeholder="Username">
+  <input type="text" id="inviteCode" placeholder="Invite Code (if not admin email)">
+  <button onclick="login()">Join Chat</button>
+</div>
 
-    <div>
-      <div class="small">Admin Panel</div>
-      <div id="adminPanelPlaceholder" class="notice small">Sign in as admin to see admin tools</div>
-      <div id="adminPanel" class="hidden">
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <div class="small">Users</div>
-          <button id="refreshUsersBtn" class="small">refresh</button>
-        </div>
-        <div class="users-list" id="usersList"></div>
-      </div>
-    </div>
-
-    <div class="small" style="margin-top:12px">
-      Tips: Use an <span class="invite-code">invite code</span> to register. Admins have gradient names.
-    </div>
+<div id="chat" style="display:none;">
+  <div style="width:90%; display:flex; justify-content: space-between; align-items:center;">
+    <input type="text" id="messageInput" placeholder="Type a message">
+    <input type="file" id="fileInput">
+    <button onclick="sendMessage()">Send</button>
   </div>
+  <div id="messages"></div>
 
-  <!-- MAIN -->
-  <div class="panel main">
-    <div class="topbar">
-      <div>
-        <div class="small">Room: <span id="currentGroupName">—</span></div>
-        <div id="groupDesc" class="small notice"></div>
-      </div>
-      <div class="right-controls">
-        <audio id="notifyAudio" src="" hidden></audio>
-        <label class="small">Notification sound:
-          <select id="soundSelect" class="small">
-            <option value="">(none)</option>
-            <option value="https://actions.google.com/sounds/v1/alarms/beep_short.ogg">Beep</option>
-            <option value="https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg">Alarm</option>
-          </select>
-        </label>
-        <button id="ttsToggle" title="Toggle auto TTS for incoming messages">TTS</button>
-      </div>
-    </div>
-
-    <div id="messages" class="messages"></div>
-
-    <div class="composer">
-      <input id="messageInput" type="text" placeholder="Write a message..." />
-      <input id="fileInput" type="file" />
-      <button id="sendBtn">Send</button>
-    </div>
+  <div id="adminPanel" style="display:none; width:90%; margin-top:10px; border:1px solid var(--muted); padding:10px; border-radius:5px;">
+    <h3>Admin Panel</h3>
+    <input type="text" id="newInvite" placeholder="Generate invite code">
+    <button onclick="generateInvite()">Generate Code</button>
+    <input type="color" id="nameColor" value="#ff7e5f">
+    <select id="nameEffect">
+      <option value="none">None</option>
+      <option value="gradient">Gradient Animation</option>
+    </select>
   </div>
 </div>
 
-<!-- Auth Modal (simple inline) -->
-<div id="authModal" class="hidden" style="position:fixed;left:0;top:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.6)">
-  <div style="width:420px;background:var(--card);padding:16px;border-radius:12px">
-    <h3 id="authTitle">Sign In</h3>
-    <div id="authForm">
-      <div style="display:grid;gap:8px">
-        <input id="email" type="email" placeholder="Email" />
-        <input id="password" type="password" placeholder="Password" />
-        <input id="displayName" type="text" placeholder="Display name (for register)" class="hidden" />
-        <input id="inviteCode" type="text" placeholder="Invite code (required to register)" class="hidden" />
-        <div style="display:flex;gap:8px;justify-content:flex-end">
-          <button id="authCancel">Cancel</button>
-          <button id="authSubmit">Submit</button>
-        </div>
-      </div>
-    </div>
-    <div style="margin-top:8px;font-size:12px;color:var(--muted)">
-      <a href="#" id="toggleRegister">Need to register?</a>
-    </div>
-  </div>
-</div>
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-storage-compat.js"></script>
 
-<script type="module">
-/*
-  Chat app using Firebase modular SDK (v9+)
-  - Replace firebaseConfig with your project's config.
-  - Create invite codes in Firestore collection "inviteCodes" using the invite string as doc id
-    and field { valid: true }.
-  - For admin: manually create user documents in "users" with {role: "admin"} or use the UI to promote.
-  - SECURITY: add Firebase Security Rules! This demo keeps logic on client for simplicity.
-*/
-
-/* ========= FIREBASE SETUP ========= */
-import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
-import {
-  getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword,
-  signOut, updateProfile
-} from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
-import {
-  getFirestore, doc, setDoc, getDoc, collection, addDoc, query, where, getDocs,
-  onSnapshot, orderBy, limit, serverTimestamp, updateDoc
-} from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
-import {
-  getStorage, ref as storageRef, uploadBytesResumable, getDownloadURL
-} from "https://www.gstatic.com/firebasejs/9.23.0/firebase-storage.js";
-
-/* ======= PASTE YOUR FIREBASE CONFIG HERE ======= */
+<script>
 const firebaseConfig = {
   apiKey: "YOUR_API_KEY",
   authDomain: "YOUR_PROJECT.firebaseapp.com",
+  databaseURL: "https://YOUR_PROJECT.firebaseio.com",
   projectId: "YOUR_PROJECT",
   storageBucket: "YOUR_PROJECT.appspot.com",
   messagingSenderId: "SENDER_ID",
   appId: "APP_ID"
 };
 
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
-const storage = getStorage(app);
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+const storage = firebase.storage();
 
-/* ======= UI ELEMENTS ======= */
-const groupsListEl = document.getElementById('groupsList');
-const messagesEl = document.getElementById('messages');
-const messageInput = document.getElementById('messageInput');
-const sendBtn = document.getElementById('sendBtn');
-const fileInput = document.getElementById('fileInput');
-const createGroupBtn = document.getElementById('createGroupBtn');
-const currentGroupName = document.getElementById('currentGroupName');
-const groupDescEl = document.getElementById('groupDesc');
-const authButtons = document.getElementById('auth-buttons');
-const currentUserName = document.getElementById('currentUserName');
-const adminPanel = document.getElementById('adminPanel');
-const adminPanelPlaceholder = document.getElementById('adminPanelPlaceholder');
-const usersList = document.getElementById('usersList');
-const authModal = document.getElementById('authModal');
-const authTitle = document.getElementById('authTitle');
-const emailInput = document.getElementById('email');
-const passwordInput = document.getElementById('password');
-const displayNameInput = document.getElementById('displayName');
-const inviteCodeInput = document.getElementById('inviteCode');
-const authSubmit = document.getElementById('authSubmit');
-const authCancel = document.getElementById('authCancel');
-const toggleRegister = document.getElementById('toggleRegister');
-const authForm = document.getElementById('authForm');
-const notifyAudio = document.getElementById('notifyAudio');
-const soundSelect = document.getElementById('soundSelect');
-const ttsToggle = document.getElementById('ttsToggle');
-const refreshUsersBtn = document.getElementById('refreshUsersBtn');
+let currentUser = "";
+let isAdmin = false;
+let userColor = "#ff7e5f";
+let userEffect = "none";
 
-let currentUser = null;
-let currentGroup = null;
-let unsubscribeMessages = null;
-let ttsEnabled = false;
+const adminEmails = ["uyiog_aghay195@ahschools.us"];
+let validInviteCodes = ["SCHOOL123"];
 
-/* ======= AUTH UI ======= */
-function renderAuthButtons(user) {
-  authButtons.innerHTML = '';
-  if (user) {
-    const btn = document.createElement('button');
-    btn.textContent = 'Sign out';
-    btn.onclick = () => signOut(auth);
-    authButtons.appendChild(btn);
+const bannedUsers = {};
+const mutedUsers = {};
+
+function login() {
+  const email = document.getElementById('email').value.trim().toLowerCase();
+  const username = document.getElementById('username').value.trim();
+  const code = document.getElementById('inviteCode').value.trim();
+
+  if(!email || !username){
+    alert("Enter both email and username!");
+    return;
+  }
+
+  if(adminEmails.includes(email)){
+    isAdmin = true;
+  } else if(validInviteCodes.includes(code)){
+    isAdmin = false;
   } else {
-    const btnIn = document.createElement('button');
-    btnIn.textContent = 'Sign in';
-    btnIn.onclick = () => openAuth(false);
-    const btnUp = document.createElement('button');
-    btnUp.textContent = 'Register';
-    btnUp.onclick = () => openAuth(true);
-    authButtons.appendChild(btnIn);
-    authButtons.appendChild(btnUp);
+    alert("Invalid invite code!");
+    return;
   }
+
+  currentUser = username;
+  document.getElementById('login').style.display = "none";
+  document.getElementById('chat').style.display = "flex";
+
+  if(isAdmin){
+    document.getElementById('adminPanel').style.display = "block";
+  }
+
+  listenMessages();
 }
 
-function openAuth(isRegister) {
-  authModal.classList.remove('hidden');
-  if (isRegister) {
-    authTitle.textContent = 'Register';
-    displayNameInput.classList.remove('hidden');
-    inviteCodeInput.classList.remove('hidden');
-    toggleRegister.textContent = 'Have an account? Sign in';
-  } else {
-    authTitle.textContent = 'Sign In';
-    displayNameInput.classList.add('hidden');
-    inviteCodeInput.classList.add('hidden');
-    toggleRegister.textContent = 'Need to register?';
-  }
-  authModal.style.display = 'flex';
-  (isRegister ? displayNameInput : emailInput).focus();
-}
-
-authCancel.onclick = () => { authModal.classList.add('hidden'); }
-toggleRegister.onclick = (e) => {
-  e.preventDefault();
-  const isRegister = authTitle.textContent !== 'Register';
-  openAuth(isRegister);
-};
-
-authSubmit.onclick = async (e) => {
-  e.preventDefault();
-  const isRegister = authTitle.textContent === 'Register';
-  const email = emailInput.value.trim();
-  const pw = passwordInput.value;
-  try {
-    if (isRegister) {
-      const displayName = displayNameInput.value.trim() || email.split('@')[0];
-      const inviteCode = inviteCodeInput.value.trim();
-      if (!inviteCode) throw new Error('Invite code required.');
-      // Check invite code in Firestore
-      const codeDoc = await getDoc(doc(db, 'inviteCodes', inviteCode));
-      if (!codeDoc.exists() || !codeDoc.data().valid) throw new Error('Invalid invite code.');
-      const cred = await createUserWithEmailAndPassword(auth, email, pw);
-      await updateProfile(cred.user, { displayName });
-      // Create user document
-      await setDoc(doc(db, 'users', cred.user.uid), {
-        displayName,
-        email,
-        createdAt: serverTimestamp(),
-        role: 'member' // default
-      });
-      authModal.classList.add('hidden');
-    } else {
-      await signInWithEmailAndPassword(auth, email, pw);
-      authModal.classList.add('hidden');
-    }
-  } catch (err) {
-    alert('Auth error: ' + err.message);
-  }
-};
-
-/* ======= AUTH STATE ======= */
-onAuthStateChanged(auth, async (user) => {
-  currentUser = user;
-  if (user) {
-    currentUserName.textContent = `${user.displayName || user.email}`;
-    renderAuthButtons(user);
-    // ensure user doc exists
-    const uRef = doc(db, 'users', user.uid);
-    const uSnap = await getDoc(uRef);
-    if (!uSnap.exists()) {
-      await setDoc(uRef, {
-        displayName: user.displayName || user.email.split('@')[0],
-        email: user.email,
-        createdAt: serverTimestamp(),
-        role: 'member'
-      });
-    }
-    // show admin panel if role admin
-    const uDoc = await getDoc(uRef);
-    const role = uDoc.data()?.role || 'member';
-    if (role === 'admin') {
-      adminPanel.classList.remove('hidden');
-      adminPanelPlaceholder.classList.add('hidden');
-      loadUsersList();
-    } else {
-      adminPanel.classList.add('hidden');
-      adminPanelPlaceholder.classList.remove('hidden');
-    }
-  } else {
-    currentUserName.textContent = 'Not signed in';
-    renderAuthButtons(null);
-    adminPanel.classList.add('hidden');
-    adminPanelPlaceholder.classList.remove('hidden');
-  }
-});
-
-/* ======= GROUPS ======= */
-// Load groups (simple: collection 'groups')
-async function loadGroups() {
-  groupsListEl.innerHTML = '';
-  const col = collection(db, 'groups');
-  const snap = await getDocs(col);
-  snap.forEach(docSnap => {
-    const d = docSnap.data();
-    const el = document.createElement('div');
-    el.className = 'group';
-    el.textContent = d.name || docSnap.id;
-    el.onclick = () => joinGroup(docSnap.id, d);
-    if (currentGroup === docSnap.id) el.classList.add('active');
-    groupsListEl.appendChild(el);
-  });
-}
-createGroupBtn.onclick = async () => {
-  if (!currentUser) { alert('Sign in to create groups'); return; }
-  const name = prompt('Group name?') || `Group-${Date.now()}`;
-  const desc = prompt('Optional description?') || '';
-  const gRef = await addDoc(collection(db, 'groups'), {
-    name, desc, createdAt: serverTimestamp(), createdBy: currentUser.uid
-  });
-  await loadGroups();
-  joinGroup(gRef.id, { name, desc });
-}
-
-/* ======= JOIN GROUP ======= */
-async function joinGroup(id, data) {
-  if (unsubscribeMessages) unsubscribeMessages();
-  currentGroup = id;
-  currentGroupName.textContent = data?.name || id;
-  groupDescEl.textContent = data?.desc || '';
-  messagesEl.innerHTML = '';
-  // subscribe to messages in this group (collection 'messages' with field groupId)
-  // We'll set up a simple query for last 200 messages.
-  const q = query(collection(db, 'messages'), where('groupId', '==', currentGroup), orderBy('createdAt'), limit(500));
-  unsubscribeMessages = onSnapshot(q, (snap) => {
-    const changes = snap.docChanges();
-    messagesEl.innerHTML = '';
-    snap.forEach(docSnap => renderMessage(docSnap.id, docSnap.data()));
-    // Play notification for new messages that aren't from this user
-    changes.forEach(c => {
-      if (c.type === 'added') {
-        const msg = c.doc.data();
-        if (msg.senderId !== (currentUser && currentUser.uid)) {
-          if (soundSelect.value) {
-            notifyAudio.src = soundSelect.value;
-            notifyAudio.play().catch(()=>{});
-          }
-          if (ttsEnabled && msg.text) doTTS(msg.text);
-        }
-      }
-    });
-    // autoscroll
-    messagesEl.scrollTop = messagesEl.scrollHeight;
+function listenMessages() {
+  const messagesRef = db.ref('messages');
+  messagesRef.on('child_added', snapshot => {
+    const data = snapshot.val();
+    if(bannedUsers[data.username]) return; // Skip banned users
+    displayMessage(data.username, data.message, data.fileUrl, snapshot.key);
   });
 }
 
-/* ======= SEND MESSAGE ========= */
-sendBtn.onclick = async () => {
-  if (!currentUser) { alert('Sign in to send'); return; }
-  if (!currentGroup) { alert('Select a group'); return; }
-  const text = messageInput.value.trim();
-  const file = fileInput.files[0];
-  let fileMeta = null;
-  if (file) {
-    // Upload to storage under 'uploads/{group}/{timestamp}_{filename}'
-    const path = `uploads/${currentGroup}/${Date.now()}_${file.name}`;
-    const sRef = storageRef(storage, path);
-    const up = uploadBytesResumable(sRef, file);
-    up.on('state_changed', snap => {
-      // could update progress bar (not implemented)
-    }, err => {
-      alert('Upload error: ' + err.message);
-    }, async () => {
-      const url = await getDownloadURL(up.snapshot.ref);
-      fileMeta = { name: file.name, url, size: file.size, contentType: file.type };
-      await pushMessage(text, fileMeta);
-    });
-  } else {
-    await pushMessage(text, null);
-  }
-  messageInput.value = '';
-  fileInput.value = '';
-};
+async function sendMessage() {
+  if(mutedUsers[currentUser]) return; // Skip if muted
+  const messageInput = document.getElementById('messageInput');
+  const fileInput = document.getElementById('fileInput');
+  const message = messageInput.value.trim();
+  let fileUrl = null;
 
-async function pushMessage(text, fileMeta) {
-  if (!currentUser || !currentGroup) return;
-  await addDoc(collection(db, 'messages'), {
-    groupId: currentGroup,
-    text: text || '',
-    file: fileMeta || null,
-    senderId: currentUser.uid,
-    senderName: currentUser.displayName || currentUser.email,
-    createdAt: serverTimestamp()
+  if(fileInput.files.length > 0){
+    const file = fileInput.files[0];
+    const storageRef = storage.ref('files/' + Date.now() + '_' + file.name);
+    await storageRef.put(file);
+    fileUrl = await storageRef.getDownloadURL();
+    fileInput.value = "";
+  }
+
+  if(!message && !fileUrl) return;
+
+  db.ref('messages').push().set({
+    username: currentUser,
+    message,
+    fileUrl,
+    timestamp: Date.now(),
+    color: userColor,
+    effect: userEffect
   });
+
+  messageInput.value = "";
 }
 
-/* ======= RENDER MESSAGE ======= */
-function renderMessage(id, msg) {
-  const el = document.createElement('div');
-  el.className = 'msg' + (currentUser && msg.senderId === currentUser.uid ? ' me' : '');
-  const meta = document.createElement('div');
-  meta.className = 'meta';
-  const author = document.createElement('span');
-  author.textContent = msg.senderName || 'Unknown';
-  // check admin flag from users collection (we can mark admin client-side based on users docs)
-  // We'll fetch user doc quickly (not optimized)
-  getDoc(doc(db,'users', msg.senderId)).then(u => {
-    const role = u.exists() ? u.data().role : null;
-    if (role === 'admin') author.classList.add('author','admin');
-  }).catch(()=>{});
-  const time = document.createElement('span');
-  time.textContent = msg.createdAt && msg.createdAt.toDate ? formatTime(msg.createdAt.toDate()) : '';
-  meta.appendChild(author);
-  meta.appendChild(time);
+function displayMessage(username, message, fileUrl, key){
+  const messagesDiv = document.getElementById('messages');
+  const div = document.createElement('div');
+  div.className = "message";
 
-  const content = document.createElement('div');
-  if (msg.text) {
-    const t = document.createElement('div');
-    t.textContent = msg.text;
-    content.appendChild(t);
-  }
-  if (msg.file) {
-    const f = document.createElement('div');
-    f.className = 'file-preview';
-    const a = document.createElement('a');
-    a.href = msg.file.url;
-    a.target = '_blank';
-    a.textContent = `🔗 ${msg.file.name} (${Math.round(msg.file.size/1024)} KB)`;
-    f.appendChild(a);
-    content.appendChild(f);
-  }
-
-  const controls = document.createElement('div');
-  controls.style.marginTop = '6px';
-  controls.style.display = 'flex';
-  controls.style.gap = '6px';
-  const ttsBtn = document.createElement('button');
-  ttsBtn.textContent = '🔊';
-  ttsBtn.title = 'Listen';
-  ttsBtn.onclick = () => doTTS(msg.text || (msg.file ? 'Attachment: ' + msg.file.name : ''));
-  controls.appendChild(ttsBtn);
-
-  // If current user is admin, show promote/demote button
-  const promoteBtn = document.createElement('button');
-  promoteBtn.textContent = '⋯';
-  promoteBtn.title = 'User actions';
-  promoteBtn.onclick = async () => {
-    if (!currentUser) return alert('Sign in');
-    const myDoc = await getDoc(doc(db,'users', currentUser.uid));
-    if (!myDoc.exists() || myDoc.data().role !== 'admin') return alert('Admins only');
-    // Show simple actions
-    const targetUid = msg.senderId;
-    const uRef = doc(db,'users',targetUid);
-    const snap = await getDoc(uRef);
-    if (!snap.exists()) return alert('User doc not found');
-    const role = snap.data().role || 'member';
-    const newRole = role === 'admin' ? 'member' : 'admin';
-    if (confirm(`${snap.data().displayName || targetUid} → ${newRole}?`)) {
-      await updateDoc(uRef, { role: newRole });
-      alert('Updated.');
-      loadUsersList();
-    }
-  };
-  controls.appendChild(promoteBtn);
-
-  el.appendChild(meta);
-  el.appendChild(content);
-  el.appendChild(controls);
-
-  messagesEl.appendChild(el);
-}
-
-/* ======= TTS ======= */
-function doTTS(text) {
-  if (!text) return;
-  if (!('speechSynthesis' in window)) return alert('No TTS in this browser');
-  const ut = new SpeechSynthesisUtterance(text);
-  speechSynthesis.cancel(); // stop previous
-  speechSynthesis.speak(ut);
-}
-ttsToggle.onclick = () => {
-  ttsEnabled = !ttsEnabled;
-  ttsToggle.style.opacity = ttsEnabled ? '1' : '0.6';
-}
-
-/* ======= USERS LIST (Admin) ======= */
-async function loadUsersList() {
-  usersList.innerHTML = '';
-  const snap = await getDocs(collection(db, 'users'));
-  snap.forEach(docSnap => {
-    const u = docSnap.data();
-    const row = document.createElement('div');
-    row.className = 'user-row';
-    const left = document.createElement('div');
-    const name = document.createElement('div');
-    name.textContent = u.displayName || docSnap.id;
-    if (u.role === 'admin') {
-      name.classList.add('admin'); // gradient via CSS
-      const badge = document.createElement('span');
-      badge.className = 'admin-badge';
-      badge.textContent = 'ADMIN';
-      left.appendChild(badge);
-    }
-    left.appendChild(name);
-    const right = document.createElement('div');
-    const btn = document.createElement('button');
-    btn.textContent = u.role === 'admin' ? 'Demote' : 'Promote';
-    btn.onclick = async () => {
-      const newRole = u.role === 'admin' ? 'member' : 'admin';
-      await updateDoc(doc(db,'users',docSnap.id), { role: newRole });
-      loadUsersList();
-    };
-    right.appendChild(btn);
-    row.appendChild(left);
-    row.appendChild(right);
-    usersList.appendChild(row);
-  });
-}
-
-refreshUsersBtn.onclick = loadUsersList;
-
-/* ======= HELPERS ======= */
-function formatTime(d) {
-  if (!d) return '';
-  return d.toLocaleString();
-}
-
-/* ======= INIT ======= */
-(async function init(){
-  renderAuthButtons(null);
-  await loadGroups();
-  // If there are no groups, create a default room
-  const groupsSnap = await getDocs(collection(db, 'groups'));
-  if (groupsSnap.empty) {
-    const g = await addDoc(collection(db,'groups'), { name: 'General', desc: 'Welcome to General', createdAt: serverTimestamp() });
-    await loadGroups();
-    joinGroup(g.id, { name: 'General', desc: 'Welcome to General' });
+  let nameStyle = "";
+  if(userEffect === "gradient"){
+    nameStyle = `background: linear-gradient(270deg, #ff7e5f, #feb47b, #ff7e5f); 
+                 background-size: 600% 600%; 
+                 -webkit-background-clip: text; 
+                 -webkit-text-fill-color: transparent; 
+                 animation: gradientShift 5s ease infinite;`;
   } else {
-    // auto-join first group
-    const first = groupsSnap.docs[0];
-    joinGroup(first.id, first.data());
+    nameStyle = `color:${userColor}`;
   }
-})();
 
-/* ======= LISTEN FOR ENTER KEY ======= */
-messageInput.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') sendBtn.click();
-});
+  div.innerHTML = `<span class="username" style="${nameStyle}">${username}</span>: ${message ? message : ''} ` +
+                  `${fileUrl ? `<a class="file-link" href="${fileUrl}" target="_blank">[File]</a>` : ''}`;
 
-/* ======= FIRESTORE: real-time group additions ======= */
-onSnapshot(collection(db, 'groups'), snap => {
-  loadGroups();
-});
+  if(isAdmin){
+    div.innerHTML += `
+      <button onclick="muteUser('${username}')">Mute</button>
+      <button onclick="kickUser('${username}')">Kick</button>
+      <button onclick="banUser('${username}')">Ban</button>
+    `;
+  }
 
-/* ======= QUICK SECURITY NOTES (you must do this offline) =========
-  - Use Firebase Security Rules to prevent non-authenticated writes.
-  - Only allow write to 'users' role by admins (use custom claims or server functions).
-  - Use Cloud Functions to mark inviteCode used or to validate invite codes on server.
-  - Do not rely on client checks for admin rights in production.
-============================================================== */
+  messagesDiv.appendChild(div);
+  messagesDiv.scrollTop = messagesDiv.scrollHeight;
+}
+
+// Admin functions
+function muteUser(username){ mutedUsers[username] = true; }
+function kickUser(username){ alert(`${username} has been kicked.`); /* Optionally disconnect user */ }
+function banUser(username){ bannedUsers[username] = true; }
+
+// Admin can generate invite codes
+function generateInvite(){
+  const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+  validInviteCodes.push(code);
+  alert("Generated invite code: " + code);
+}
+
+// Admin can change name color or effect
+document.getElementById('nameColor').addEventListener('input', e => { userColor = e.target.value; });
+document.getElementById('nameEffect').addEventListener('change', e => { userEffect = e.target.value; });
 
 </script>
+
 </body>
 </html>
