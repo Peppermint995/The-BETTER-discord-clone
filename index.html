@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Realtime Chat App with Admin Controls</title>
+<title>Realtime Multi-Room Chat</title>
 <style>
   :root {
     --bg: #121212;
@@ -60,6 +60,7 @@
     margin-bottom: 8px;
     display: flex;
     justify-content: space-between;
+    align-items: center;
   }
 
   .username {
@@ -72,7 +73,6 @@
     cursor: pointer;
   }
 
-  /* Admin name gradient animation */
   @keyframes gradientShift {
     0% { background-position: 0% 50%; }
     50% { background-position: 100% 50%; }
@@ -83,22 +83,26 @@
 </head>
 <body>
 
-<header>Realtime Chat App - Admin Controls</header>
+<header>Realtime Multi-Room Chat</header>
 
 <div id="login">
   <input type="text" id="email" placeholder="Email">
   <input type="text" id="username" placeholder="Username">
-  <input type="text" id="inviteCode" placeholder="Invite Code (if not admin email)">
+  <input type="text" id="inviteCode" placeholder="Invite Code (if not admin)">
   <button onclick="login()">Join Chat</button>
 </div>
 
 <div id="chat" style="display:none;">
   <div style="width:90%; display:flex; justify-content: space-between; align-items:center;">
+    <select id="roomSelect" onchange="changeRoom()"></select>
+    <button onclick="createRoom()">New Room</button>
+  </div>
+  <div id="messages"></div>
+  <div style="width:90%; display:flex; justify-content: space-between;">
     <input type="text" id="messageInput" placeholder="Type a message">
     <input type="file" id="fileInput">
     <button onclick="sendMessage()">Send</button>
   </div>
-  <div id="messages"></div>
 
   <div id="adminPanel" style="display:none; width:90%; margin-top:10px; border:1px solid var(--muted); padding:10px; border-radius:5px;">
     <h3>Admin Panel</h3>
@@ -112,7 +116,6 @@
   </div>
 </div>
 
-<!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-storage-compat.js"></script>
@@ -136,10 +139,10 @@ let currentUser = "";
 let isAdmin = false;
 let userColor = "#ff7e5f";
 let userEffect = "none";
+let currentRoom = "general";
 
 const adminEmails = ["uyiog_aghay195@ahschools.us"];
 let validInviteCodes = ["SCHOOL123"];
-
 const bannedUsers = {};
 const mutedUsers = {};
 
@@ -170,20 +173,56 @@ function login() {
     document.getElementById('adminPanel').style.display = "block";
   }
 
+  setupRooms();
+}
+
+// Room management
+function setupRooms(){
+  const roomSelect = document.getElementById('roomSelect');
+  db.ref('rooms').once('value', snap=>{
+    roomSelect.innerHTML = "";
+    snap.forEach(r=>{
+      const opt = document.createElement('option');
+      opt.value = r.key;
+      opt.textContent = r.key;
+      roomSelect.appendChild(opt);
+    });
+    if(!snap.hasChild('general')) db.ref('rooms/general').set(true);
+    roomSelect.value = currentRoom;
+    listenMessages();
+  });
+}
+
+function createRoom(){
+  const name = prompt("Enter room name:");
+  if(name){
+    db.ref('rooms/'+name).set(true);
+    currentRoom = name;
+    document.getElementById('roomSelect').value = name;
+    listenMessages();
+  }
+}
+
+function changeRoom(){
+  currentRoom = document.getElementById('roomSelect').value;
   listenMessages();
 }
 
+// Chat functions
 function listenMessages() {
-  const messagesRef = db.ref('messages');
+  const messagesDiv = document.getElementById('messages');
+  messagesDiv.innerHTML = "";
+  const messagesRef = db.ref('messages/' + currentRoom);
+  messagesRef.off();
   messagesRef.on('child_added', snapshot => {
     const data = snapshot.val();
-    if(bannedUsers[data.username]) return; // Skip banned users
-    displayMessage(data.username, data.message, data.fileUrl, snapshot.key);
+    if(bannedUsers[data.username]) return;
+    displayMessage(data.username, data.message, data.fileUrl, snapshot.key, data.color, data.effect);
   });
 }
 
 async function sendMessage() {
-  if(mutedUsers[currentUser]) return; // Skip if muted
+  if(mutedUsers[currentUser]) return;
   const messageInput = document.getElementById('messageInput');
   const fileInput = document.getElementById('fileInput');
   const message = messageInput.value.trim();
@@ -199,7 +238,7 @@ async function sendMessage() {
 
   if(!message && !fileUrl) return;
 
-  db.ref('messages').push().set({
+  db.ref('messages/' + currentRoom).push().set({
     username: currentUser,
     message,
     fileUrl,
@@ -208,24 +247,23 @@ async function sendMessage() {
     effect: userEffect
   });
 
+  // Text to speech
+  if(message) {
+    const msg = new SpeechSynthesisUtterance(`${currentUser} says ${message}`);
+    speechSynthesis.speak(msg);
+  }
+
   messageInput.value = "";
 }
 
-function displayMessage(username, message, fileUrl, key){
+function displayMessage(username, message, fileUrl, key, color="#fff", effect="none"){
   const messagesDiv = document.getElementById('messages');
   const div = document.createElement('div');
   div.className = "message";
 
-  let nameStyle = "";
-  if(userEffect === "gradient"){
-    nameStyle = `background: linear-gradient(270deg, #ff7e5f, #feb47b, #ff7e5f); 
-                 background-size: 600% 600%; 
-                 -webkit-background-clip: text; 
-                 -webkit-text-fill-color: transparent; 
-                 animation: gradientShift 5s ease infinite;`;
-  } else {
-    nameStyle = `color:${userColor}`;
-  }
+  let nameStyle = effect==="gradient" 
+    ? `background: linear-gradient(270deg, #ff7e5f, #feb47b, #ff7e5f); background-size:600% 600%; -webkit-background-clip:text; -webkit-text-fill-color:transparent; animation: gradientShift 5s ease infinite;`
+    : `color:${color}`;
 
   div.innerHTML = `<span class="username" style="${nameStyle}">${username}</span>: ${message ? message : ''} ` +
                   `${fileUrl ? `<a class="file-link" href="${fileUrl}" target="_blank">[File]</a>` : ''}`;
@@ -242,19 +280,18 @@ function displayMessage(username, message, fileUrl, key){
   messagesDiv.scrollTop = messagesDiv.scrollHeight;
 }
 
-// Admin functions
+// Admin controls
 function muteUser(username){ mutedUsers[username] = true; }
-function kickUser(username){ alert(`${username} has been kicked.`); /* Optionally disconnect user */ }
+function kickUser(username){ alert(`${username} kicked!`); }
 function banUser(username){ bannedUsers[username] = true; }
 
-// Admin can generate invite codes
+// Admin invite generation
 function generateInvite(){
   const code = Math.random().toString(36).substring(2, 8).toUpperCase();
   validInviteCodes.push(code);
   alert("Generated invite code: " + code);
 }
 
-// Admin can change name color or effect
 document.getElementById('nameColor').addEventListener('input', e => { userColor = e.target.value; });
 document.getElementById('nameEffect').addEventListener('change', e => { userEffect = e.target.value; });
 
