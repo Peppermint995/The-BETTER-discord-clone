@@ -5,161 +5,79 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>School Chat</title>
 <style>
-  :root {
-    --bg: #121212;
-    --card: #1f1f1f;
-    --muted: rgba(255,255,255,0.7);
-    --accent: #0078ff;
-  }
-  body {
-    margin: 0;
-    font-family: Arial, sans-serif;
-    background: var(--bg);
-    color: white;
-    display: flex;
-    height: 100vh;
-    overflow: hidden;
-  }
-  #sidebar {
-    width: 200px;
-    background: var(--card);
-    display: flex;
-    flex-direction: column;
-    padding: 10px;
-  }
-  #sidebar h2 {
-    margin: 0 0 10px 0;
-    font-size: 18px;
-    text-align: center;
-  }
-  #groupList {
-    flex: 1;
-    overflow-y: auto;
-  }
-  #groupList div {
-    padding: 8px;
-    cursor: pointer;
-    border-radius: 5px;
-    word-break: break-word;
-  }
-  #groupList div.active {
-    background: var(--accent);
-    color: white;
-  }
-  #main {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-  }
-  #chatBox {
-    flex: 1;
-    overflow-y: auto;
-    padding: 10px;
-    word-wrap: break-word;
-  }
-  .message {
-    margin-bottom: 10px;
-    line-height: 1.4;
-    opacity: 0;
-    animation: fadeIn 0.5s forwards;
-    padding: 4px 6px;
-    border-radius: 5px;
-  }
-  .message.new {
-    background: rgba(0, 120, 255, 0.2);
-    transition: background 2s ease;
-  }
-  .user {
-    font-weight: bold;
-  }
-  .admin {
-    background: linear-gradient(270deg,#ff6ec4,#7873f5,#42e695,#ff6ec4);
-    background-size: 600% 600%;
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    animation: gradient 6s ease infinite;
-  }
-  .timestamp {
-    color: rgba(255,255,255,0.5);
-    font-size: 0.8em;
-    margin-left: 5px;
-  }
-  @keyframes gradient {
-    0% {background-position:0% 50%;}
-    50% {background-position:100% 50%;}
-    100% {background-position:0% 50%;}
-  }
-  @keyframes fadeIn {
-    to { opacity: 1; }
-  }
-  #inputBox {
-    display: flex;
-    padding: 10px;
-    background: var(--card);
-  }
-  #msgInput {
-    flex: 1;
-    padding: 8px;
-    border: none;
-    border-radius: 5px;
-    margin-right: 5px;
-    word-wrap: break-word;
-  }
-  #sendBtn, #clearBtn {
-    padding: 8px 12px;
-    border: none;
-    border-radius: 5px;
-    background: var(--accent);
-    color: white;
-    cursor: pointer;
-    margin-left: 3px;
-  }
-  #loginBox {
-    position: absolute;
-    top:0; left:0; width:100%; height:100%;
-    display:flex;
-    justify-content:center;
-    align-items:center;
-    background: rgba(0,0,0,0.85);
-    flex-direction: column;
-  }
-  #loginBox input {
-    margin:5px 0;
-    padding:8px;
-    width:200px;
-    border-radius:5px;
-    border:none;
-  }
-  #loginBox button {
-    padding:8px 12px;
-    border:none;
-    border-radius:5px;
-    background: var(--accent);
-    color:white;
-    cursor:pointer;
-    margin-top:5px;
-  }
-  #notifControl {
-    margin-top:10px;
-    text-align:center;
-  }
-  #notifControl input {
-    width:100%;
-  }
-  #ttsToggle {
-    margin-top: 10px;
-    text-align: center;
-    cursor: pointer;
-    padding: 5px;
-    background: #333;
-    border-radius: 5px;
-  }
-  /* Mobile */
-  @media(max-width:600px){
-    #sidebar {width:120px;}
-    #groupList div {font-size:12px; padding:6px;}
-    #msgInput {width:100px;}
-  }
+:root {
+  --bg: #121212;
+  --card: #1f1f1f;
+  --muted: rgba(255,255,255,0.7);
+  --accent: #0078ff;
+}
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: var(--bg);
+  color: white;
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+#sidebar {
+  width: 200px;
+  background: var(--card);
+  display: flex;
+  flex-direction: column;
+  padding: 10px;
+}
+#sidebar h2 { margin:0 0 10px 0; font-size:18px; text-align:center; }
+#groupList { flex:1; overflow-y:auto; }
+#groupList div {
+  padding:8px; cursor:pointer; border-radius:5px; word-break: break-word;
+}
+#groupList div.active { background: var(--accent); color:white; }
+#main { flex:1; display:flex; flex-direction:column; }
+#chatBox { flex:1; overflow-y:auto; padding:10px; word-wrap: break-word; }
+.message {
+  margin-bottom:10px; line-height:1.4; opacity:0; animation:fadeIn 0.5s forwards;
+  padding:4px 6px; border-radius:5px;
+}
+.message.new { background: rgba(0,120,255,0.2); transition: background 2s ease; }
+.user { font-weight:bold; }
+.admin {
+  background: linear-gradient(270deg,#ff6ec4,#7873f5,#42e695,#ff6ec4);
+  background-size:600% 600%;
+  -webkit-background-clip:text;
+  -webkit-text-fill-color:transparent;
+  animation: gradient 6s ease infinite;
+}
+.timestamp { color:rgba(255,255,255,0.5); font-size:0.8em; margin-left:5px; }
+.bold { font-weight:bold; }
+.italic { font-style:italic; }
+.color-red { color:red; }
+.color-green { color:lime; }
+.color-blue { color:cyan; }
+.animated { animation: gradient 6s ease infinite; -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+@keyframes gradient {
+  0% {background-position:0% 50%;} 50% {background-position:100% 50%;} 100% {background-position:0% 50%;}
+}
+@keyframes fadeIn { to { opacity:1; } }
+#inputBox { display:flex; padding:10px; background:var(--card); }
+#msgInput { flex:1; padding:8px; border:none; border-radius:5px; margin-right:5px; word-wrap: break-word; }
+#sendBtn, #clearBtn { padding:8px 12px; border:none; border-radius:5px; background: var(--accent); color:white; cursor:pointer; margin-left:3px; }
+#loginBox {
+  position:absolute; top:0; left:0; width:100%; height:100%;
+  display:flex; justify-content:center; align-items:center;
+  background: rgba(0,0,0,0.85); flex-direction: column;
+}
+#loginBox input { margin:5px 0; padding:8px; width:200px; border-radius:5px; border:none; }
+#loginBox button { padding:8px 12px; border:none; border-radius:5px; background: var(--accent); color:white; cursor:pointer; margin-top:5px; }
+#notifControl { margin-top:10px; text-align:center; }
+#notifControl input { width:100%; }
+#ttsToggle { margin-top:10px; text-align:center; cursor:pointer; padding:5px; background:#333; border-radius:5px; }
+#adminPanel { margin-top:10px; display:none; }
+@media(max-width:600px){
+  #sidebar { width:120px; }
+  #groupList div { font-size:12px; padding:6px; }
+  #msgInput { width:100px; }
+}
 </style>
 </head>
 <body>
@@ -172,6 +90,23 @@
     <input type="file" id="notifUpload" accept="audio/*">
   </div>
   <div id="ttsToggle">TTS: On</div>
+  <div id="adminPanel">
+    <button id="adminClearBtn">Clear Chat (Admin)</button>
+    <button id="generateInviteBtn">Generate Invite Code</button>
+    <div id="newInviteCode"></div>
+    <div style="margin-top:5px;">
+      <label>Admin Effects:</label>
+      <select id="effectSelect">
+        <option value="">None</option>
+        <option value="bold">Bold</option>
+        <option value="italic">Italic</option>
+        <option value="color-red">Red</option>
+        <option value="color-green">Green</option>
+        <option value="color-blue">Blue</option>
+        <option value="animated">Animated</option>
+      </select>
+    </div>
+  </div>
 </div>
 
 <div id="main">
@@ -180,6 +115,7 @@
     <input type="text" id="msgInput" placeholder="Type a message..." />
     <button id="sendBtn">Send</button>
     <button id="clearBtn">Clear Chat</button>
+    <button id="broadcastBtn">Broadcast</button>
   </div>
 </div>
 
@@ -187,18 +123,19 @@
   <h2>Login/Register</h2>
   <input type="email" id="emailInput" placeholder="Email">
   <input type="text" id="inviteCodeInput" placeholder="Invite Code">
-  <button id="loginBtn">Login</button>
-  <small>Use code: <b>SCHOOL123</b></small>
+  <button id="loginBtn">Next</button>
 </div>
 
 <audio id="notifSound" src="https://www.soundjay.com/buttons/sounds/button-3.mp3"></audio>
 
 <script>
 let currentUser = '';
+let currentName = '';
 let currentGroup = '';
 const admins = ['uyiog_aghay195@ahschools.us'];
 let ttsEnabled = true;
 let notifSound = document.getElementById('notifSound');
+let inviteCodes = ['SCHOOL123'];
 
 // Groups
 const groups = ['General','Math','Science','Fun'];
@@ -206,115 +143,122 @@ const groupList = document.getElementById('groupList');
 groups.forEach(g => {
   const div = document.createElement('div');
   div.textContent = g;
-  div.onclick = () => {
-    currentGroup = g;
-    document.querySelectorAll('#groupList div').forEach(d=>d.classList.remove('active'));
-    div.classList.add('active');
-    loadMessages();
-  };
+  div.onclick = () => { currentGroup = g; document.querySelectorAll('#groupList div').forEach(d=>d.classList.remove('active')); div.classList.add('active'); loadMessages(); };
   groupList.appendChild(div);
 });
 currentGroup = groups[0];
 groupList.children[0].classList.add('active');
 
-// Login/Register
+// Check persistent login
+if(localStorage.getItem('chatUser')){
+  currentUser = localStorage.getItem('chatUser');
+  currentName = localStorage.getItem('chatName');
+  document.getElementById('loginBox').style.display='none';
+  if(admins.includes(currentUser)) document.getElementById('adminPanel').style.display='block';
+  loadMessages();
+}
+
+// Login/Register flow
 document.getElementById('loginBtn').onclick = () => {
   const email = document.getElementById('emailInput').value.trim();
   const code = document.getElementById('inviteCodeInput').value.trim();
-  if(!email || code !== 'SCHOOL123') { alert('Invalid email or invite code'); return; }
+  if(!email || !inviteCodes.includes(code)) { alert('Invalid email or invite code'); return; }
   currentUser = email;
-  document.getElementById('loginBox').style.display = 'none';
+  const name = prompt("Enter your display name:");
+  if(!name) { alert('Display name required'); return; }
+  currentName = name;
+  document.getElementById('loginBox').style.display='none';
+  localStorage.setItem('chatUser',currentUser);
+  localStorage.setItem('chatName',currentName);
+  if(admins.includes(currentUser)) document.getElementById('adminPanel').style.display='block';
   loadMessages();
 };
 
-// Send message
-document.getElementById('sendBtn').onclick = () => {
-  const input = document.getElementById('msgInput');
-  const text = input.value.trim();
+// Send message function
+function sendMessage(text,isBroadcast=false){
   if(!text) return;
-  sendMessage(text);
-  input.value='';
-};
-
-// Clear chat
-document.getElementById('clearBtn').onclick = () => {
-  if(confirm('Are you sure you want to clear the chat?')){
-    localStorage.setItem('chatMessages','[]');
-    loadMessages();
-  }
-};
-
-function sendMessage(text) {
-  if(!text || !currentGroup) return;
   const messages = JSON.parse(localStorage.getItem('chatMessages')||'[]');
-  const timestamp = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
-  messages.push({user:currentUser,group:currentGroup,text,timestamp});
+  const timestamp = new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+  const effect = (admins.includes(currentUser)) ? document.getElementById('effectSelect').value : '';
+  messages.push({user:currentUser,name:currentName,group:isBroadcast?'Broadcast':currentGroup,text,effect,timestamp});
   localStorage.setItem('chatMessages',JSON.stringify(messages));
   loadMessages(true);
-
-  // TTS
-  if(ttsEnabled) {
+  if(ttsEnabled){
     const utter = new SpeechSynthesisUtterance(text);
     speechSynthesis.cancel();
     speechSynthesis.speak(utter);
   }
-
-  // Notification
-  if(currentUser !== localStorage.getItem('lastUser')){
-    notifSound.play().catch(e=>console.log(e));
-  }
+  if(currentUser!==localStorage.getItem('lastUser')) notifSound.play().catch(e=>console.log(e));
   localStorage.setItem('lastUser',currentUser);
 }
 
 // Load messages
-function loadMessages(highlight=false) {
+function loadMessages(highlight=false){
   const messages = JSON.parse(localStorage.getItem('chatMessages')||'[]');
   const chatBox = document.getElementById('chatBox');
   chatBox.innerHTML='';
   messages.forEach(msg=>{
-    if(msg.group !== currentGroup) return;
-    const div = document.createElement('div');
-    div.className = 'message';
+    if(msg.group!==currentGroup && msg.group!=='Broadcast') return;
+    const div=document.createElement('div');
+    div.className='message';
     if(highlight) div.classList.add('new');
-    const userSpan = document.createElement('span');
-    userSpan.textContent = msg.user;
+
+    const userSpan=document.createElement('span');
+    userSpan.textContent=msg.name;
     if(admins.includes(msg.user)) userSpan.className='user admin';
     else userSpan.className='user';
-    const textSpan = document.createElement('span');
-    textSpan.textContent = ': '+msg.text;
-    const timeSpan = document.createElement('span');
+    
+    const textSpan=document.createElement('span');
+    textSpan.textContent=': '+msg.text;
+    if(msg.effect) textSpan.className=msg.effect;
+
+    const timeSpan=document.createElement('span');
     timeSpan.className='timestamp';
-    timeSpan.textContent = ` (${msg.timestamp})`;
+    timeSpan.textContent=` (${msg.timestamp})`;
+
     div.appendChild(userSpan);
     div.appendChild(textSpan);
     div.appendChild(timeSpan);
     chatBox.appendChild(div);
 
-    // Fade out highlight after 2s
-    if(div.classList.contains('new')){
-      setTimeout(()=>{div.classList.remove('new');},2000);
-    }
+    if(div.classList.contains('new')) setTimeout(()=>{div.classList.remove('new');},2000);
   });
-  chatBox.scrollTop = chatBox.scrollHeight;
+  chatBox.scrollTop=chatBox.scrollHeight;
 }
 
-// Reload messages on storage change (multi-tab)
-window.addEventListener('storage', loadMessages);
+// Send button
+document.getElementById('sendBtn').onclick = () => sendMessage(document.getElementById('msgInput').value);
 
-// Custom notification upload
-document.getElementById('notifUpload').addEventListener('change', (e)=>{
-  const file = e.target.files[0];
-  if(file){
-    notifSound.src = URL.createObjectURL(file);
-    notifSound.load();
-  }
+// Broadcast button
+document.getElementById('broadcastBtn').onclick = () => {
+  if(admins.includes(currentUser)){
+    const text = document.getElementById('msgInput').value;
+    if(!text) return;
+    sendMessage(text,true);
+    document.getElementById('msgInput').value='';
+  } else alert('Only admins can broadcast!');
+};
+
+// Clear chat
+document.getElementById('clearBtn').onclick = () => { if(confirm('Clear chat view?')) document.getElementById('chatBox').innerHTML=''; };
+// Admin clear
+document.getElementById('adminClearBtn').onclick = () => { if(confirm('Admin clear all messages?')){ localStorage.setItem('chatMessages','[]'); loadMessages(); } };
+// Generate invite
+document.getElementById('generateInviteBtn').onclick = () => { const code='INV'+Math.floor(Math.random()*9000+1000); inviteCodes.push(code); document.getElementById('newInviteCode').textContent='New code: '+code; };
+
+// Custom notification
+document.getElementById('notifUpload').addEventListener('change',(e)=>{ const f=e.target.files[0]; if(f){ notifSound.src=URL.createObjectURL(f); notifSound.load(); }});
+// TTS toggle
+document.getElementById('ttsToggle').onclick = ()=>{ ttsEnabled=!ttsEnabled; document.getElementById('ttsToggle').textContent=`TTS: ${ttsEnabled?'On':'Off'}`; };
+
+// Enter key sends message
+document.getElementById('msgInput').addEventListener('keypress',e=>{
+  if(e.key==='Enter'){ sendMessage(document.getElementById('msgInput').value); document.getElementById('msgInput').value=''; }
 });
 
-// TTS toggle
-document.getElementById('ttsToggle').onclick = () => {
-  ttsEnabled = !ttsEnabled;
-  document.getElementById('ttsToggle').textContent = `TTS: ${ttsEnabled ? 'On':'Off'}`;
-};
+// Multi-tab sync
+window.addEventListener('storage', loadMessages);
+
 </script>
 </body>
 </html>
