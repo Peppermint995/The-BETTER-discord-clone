@@ -119,6 +119,13 @@
     cursor:pointer;
     margin-top:5px;
   }
+  #notifControl {
+    margin-top:10px;
+    text-align:center;
+  }
+  #notifControl input {
+    width:100%;
+  }
   /* Mobile */
   @media(max-width:600px){
     #sidebar {width:120px;}
@@ -132,6 +139,10 @@
 <div id="sidebar">
   <h2>Groups</h2>
   <div id="groupList"></div>
+  <div id="notifControl">
+    <label>Notification Sound:</label>
+    <input type="file" id="notifUpload" accept="audio/*">
+  </div>
 </div>
 
 <div id="main">
@@ -157,11 +168,10 @@ let currentUser = '';
 let currentGroup = '';
 const admins = ['uyiog_aghay195@ahschools.us'];
 let ttsEnabled = true;
+let notifSound = document.getElementById('notifSound');
 
-// Hardcoded groups
+// Groups
 const groups = ['General','Math','Science','Fun'];
-
-// Initialize groups
 const groupList = document.getElementById('groupList');
 groups.forEach(g => {
   const div = document.createElement('div');
@@ -202,7 +212,7 @@ function sendMessage(text) {
   messages.push({user:currentUser,group:currentGroup,text});
   localStorage.setItem('chatMessages',JSON.stringify(messages));
   loadMessages();
-  
+
   // TTS
   if(ttsEnabled) {
     const utter = new SpeechSynthesisUtterance(text);
@@ -212,8 +222,7 @@ function sendMessage(text) {
 
   // Notification
   if(currentUser !== localStorage.getItem('lastUser')){
-    const sound = document.getElementById('notifSound');
-    sound.play();
+    notifSound.play();
   }
   localStorage.setItem('lastUser',currentUser);
 }
@@ -243,7 +252,14 @@ function loadMessages() {
 
 // Reload messages on storage change (multi-tab)
 window.addEventListener('storage', loadMessages);
+
+// Custom notification upload
+document.getElementById('notifUpload').addEventListener('change', (e)=>{
+  const file = e.target.files[0];
+  if(file){
+    notifSound.src = URL.createObjectURL(file);
+  }
+});
 </script>
 </body>
 </html>
-
