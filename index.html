@@ -1,441 +1,244 @@
-<!-- Save as index.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Chat Room - Firebase Realtime</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chat Room</title>
+
 <style>
-:root {
-  --bg: #121212;
-  --card: #1f1f1f;
-  --muted: rgba(255,255,255,0.7);
-  --accent: #0078ff;
-}
-body {
-  margin: 0;
-  font-family: Arial, sans-serif;
-  background: var(--bg);
-  color: white;
-  display: flex;
-  height: 100vh;
-  overflow: hidden;
-}
-#sidebar {
-  width: 220px;
-  background: var(--card);
-  display: flex;
-  flex-direction: column;
-  padding: 10px;
-}
-#sidebar h2 { margin:0 0 10px 0; font-size:18px; text-align:center; }
-#groupList { flex:1; overflow-y:auto; }
-#groupList div {
-  padding:8px; cursor:pointer; border-radius:5px; word-break: break-word;
-}
-#groupList div.active { background: var(--accent); color:white; }
-#main { flex:1; display:flex; flex-direction:column; }
-#chatBox { flex:1; overflow-y:auto; padding:10px; word-wrap: break-word; }
-.message {
-  margin-bottom:10px; line-height:1.4; opacity:0; animation:fadeIn 0.5s forwards;
-  padding:4px 6px; border-radius:5px;
-}
-.message.new { background: rgba(0,120,255,0.12); transition: background 2s ease; }
-.user { font-weight:bold; margin-right:4px; }
-.admin {
-  background: linear-gradient(270deg,#ff6ec4,#7873f5,#42e695,#ff6ec4);
-  background-size:600% 600%;
-  -webkit-background-clip:text;
-  -webkit-text-fill-color:transparent;
-  animation: gradient 6s ease infinite;
-}
-.timestamp { color:rgba(255,255,255,0.5); font-size:0.8em; margin-left:5px; }
-.bold { font-weight:bold; }
-.italic { font-style:italic; }
-.color-red { color:red; }
-.color-green { color:lime; }
-.color-blue { color:cyan; }
-.animated { animation: gradient 6s ease infinite; -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
-@keyframes gradient {
-  0% {background-position:0% 50%;} 50% {background-position:100% 50%;} 100% {background-position:0% 50%;}
-}
-@keyframes fadeIn { to { opacity:1; } }
-#inputBox { display:flex; padding:10px; background:var(--card); }
-#msgInput { flex:1; padding:8px; border:none; border-radius:5px; margin-right:5px; word-wrap: break-word; background:#0f0f0f; color:white; }
-#sendBtn, #clearBtn, #broadcastBtn, #createGroupBtn { padding:8px 12px; border:none; border-radius:5px; background: var(--accent); color:white; cursor:pointer; margin-left:3px; }
-#loginBox {
-  position:absolute; top:0; left:0; width:100%; height:100%;
-  display:flex; justify-content:center; align-items:center;
-  background: rgba(0,0,0,0.85); flex-direction: column;
-}
-#loginBox input { margin:5px 0; padding:8px; width:260px; border-radius:5px; border:none; }
-#loginBox button { padding:8px 12px; border:none; border-radius:5px; background: var(--accent); color:white; cursor:pointer; margin-top:5px; }
-#notifControl { margin-top:10px; text-align:center; }
-#notifControl input { width:100%; }
-#ttsToggle { margin-top:10px; text-align:center; cursor:pointer; padding:5px; background:#333; border-radius:5px; }
-#adminPanel { margin-top:10px; display:none; }
-#adminPanel input { width:100%; margin:5px 0; padding:5px; border-radius:5px; border:none; }
-@media(max-width:600px){
-  #sidebar { width:120px; }
-  #groupList div { font-size:12px; padding:6px; }
-  #msgInput { width:100px; }
-}
-.small { font-size:0.85em; color:var(--muted); margin-top:6px; text-align:center; }
+  body {
+    margin: 0;
+    background: #121212;
+    font-family: Arial, sans-serif;
+    color: white;
+    overflow: hidden;
+  }
+
+  #loginScreen, #chatScreen {
+    width: 100vw;
+    height: 100vh;
+    display: none;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+  }
+
+  #loginScreen { display: flex; }
+  .card {
+    background: #1f1f1f;
+    padding: 20px;
+    border-radius: 12px;
+    width: 320px;
+    box-shadow: 0 0 12px rgba(0,0,0,0.6);
+  }
+
+  input, button {
+    width: 100%;
+    padding: 10px;
+    margin-top: 8px;
+    border-radius: 6px;
+    border: none;
+    outline: none;
+  }
+
+  button {
+    background: #0078ff;
+    color: white;
+    cursor: pointer;
+  }
+
+  #chatBox {
+    position: absolute;
+    top: 0; left: 0;
+    right: 0; bottom: 60px;
+    padding: 10px;
+    overflow-y: auto;
+  }
+
+  #messageInputBox {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    padding: 10px;
+    background: #1f1f1f;
+    display: flex;
+    gap: 10px;
+  }
+
+  #messageInput {
+    flex: 1;
+  }
 </style>
 </head>
 <body>
 
-<div id="sidebar">
-  <h2>Groups</h2>
-  <div id="groupList"></div>
+<!-- LOGIN SCREEN -->
+<div id="loginScreen">
+  <div class="card">
+    <h2>Register / Login</h2>
+    <input id="regEmail" type="email" placeholder="Email">
+    <input id="regPassword" type="password" placeholder="Password">
+    <input id="inviteCode" type="text" placeholder="Invite Code">
+    <button onclick="register()">Register</button>
 
-  <div id="adminPanel">
-    <input type="text" id="newGroupInput" placeholder="New Group Name">
-    <button id="createGroupBtn">Create Group</button>
-    <button id="adminClearBtn">Clear Chat (Admin)</button>
-    <button id="generateInviteBtn">Generate Invite Code</button>
-    <div id="newInviteCode" class="small"></div>
-    <div style="margin-top:5px;">
-      <label>Admin Effects:</label>
-      <select id="effectSelect">
-        <option value="">None</option>
-        <option value="bold">Bold</option>
-        <option value="italic">Italic</option>
-        <option value="color-red">Red</option>
-        <option value="color-green">Green</option>
-        <option value="color-blue">Blue</option>
-        <option value="animated">Animated</option>
-      </select>
-    </div>
+    <hr style="margin: 15px 0; opacity: 0.3">
+
+    <input id="loginEmail" type="email" placeholder="Email">
+    <input id="loginPassword" type="password" placeholder="Password">
+    <button onclick="login()">Login</button>
   </div>
-
-  <div id="notifControl">
-    <label class="small">Notification Sound:</label>
-    <input type="file" id="notifUpload" accept="audio/*">
-  </div>
-
-  <div id="ttsToggle">TTS: On</div>
 </div>
 
-<div id="main">
+<!-- CHAT SCREEN -->
+<div id="chatScreen">
   <div id="chatBox"></div>
-  <div id="inputBox">
-    <input type="text" id="msgInput" placeholder="Type a message..." />
-    <button id="sendBtn">Send</button>
-    <button id="broadcastBtn">Broadcast</button>
+
+  <div id="messageInputBox">
+    <input id="messageInput" type="text" placeholder="Type message...">
+    <button onclick="sendMessage()">Send</button>
   </div>
 </div>
 
-<div id="loginBox">
-  <h2>Login / Register</h2>
-  <input type="email" id="emailInput" placeholder="Email">
-  <input type="text" id="inviteCodeInput" placeholder="Invite Code">
-  <button id="loginBtn">Next</button>
-  <div class="small">If your email is new the app will register you (no password required).</div>
-</div>
 
-<audio id="notifSound" src="https://www.soundjay.com/buttons/sounds/button-3.mp3"></audio>
-
-<!-- Firebase SDKs (compat) -->
-<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+<!-- FIREBASE -->
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js"></script>
 
 <script>
-/*
-  Replace databaseURL if your Realtime DB URL differs.
-  Using the firebaseConfig you provided (I kept your keys).
-*/
+/* -----------------------------
+      🔥 FIREBASE CONFIG
+------------------------------ */
 const firebaseConfig = {
-  apiKey: "AIzaSyBIMQt_N3Z4nLabjV9Erj7SzlvHmhaqo4Q",
-  authDomain: "chat-78682.firebaseapp.com",
-  projectId: "chat-78682",
-  storageBucket: "chat-78682.firebasestorage.app",
-  messagingSenderId: "650441779462",
-  appId: "1:650441779462:web:8ad0bc03119881ec49d687",
-  measurementId: "G-R4VY4PVDV4",
-  // Typical Realtime DB default: https://<projectId>-default-rtdb.firebaseio.com
-  // If your DB url is different replace the value below:
-  databaseURL: "https://chat-78682-default-rtdb.firebaseio.com"
+  apiKey: "YOUR_KEY",
+  authDomain: "YOUR_DOMAIN",
+  databaseURL: "YOUR_DB_URL",
+  projectId: "YOUR_PROJECT",
+  storageBucket: "YOUR_BUCKET",
+  messagingSenderId: "YOUR_SENDER",
+  appId: "YOUR_APPID"
 };
 
-firebase.initializeApp(firebaseConfig);
-const db = firebase.database();
+const app = firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const database = firebase.database();
 
-let currentUser = '';
-let currentName = '';
-let currentGroup = '';
-const admins = ['uyiog_aghay195@ahschools.us']; // Admin owners
-let ttsEnabled = true;
-let notifSound = document.getElementById('notifSound');
-let localInviteCodes = []; // cached invite codes from DB
-
-// UI references
-const groupList = document.getElementById('groupList');
-const chatBox = document.getElementById('chatBox');
-
-// -----------------------------------------------------------------------------
-// Utility: push a message object into Realtime DB
-function saveMessageToDB(msgObj){
-  const msgRef = db.ref('messages').push();
-  msgRef.set(msgObj);
-}
-
-// Utility: push group list to DB when created
-function saveGroupToDB(groupName){
-  const gRef = db.ref('groups').push();
-  gRef.set({name: groupName, createdAt: Date.now()});
-}
-
-// Utility: add invite code to DB
-function saveInviteToDB(code){
-  const r = db.ref('inviteCodes').push();
-  r.set({code, createdAt: Date.now()});
-}
-
-// -----------------------------------------------------------------------------
-// Render groups (local cached array)
-let groups = ['General','Math','Science','Fun'];
-function renderGroups(){
-  groupList.innerHTML='';
-  groups.forEach(g => {
-    const div = document.createElement('div');
-    div.textContent = g;
-    div.onclick = () => { currentGroup = g; document.querySelectorAll('#groupList div').forEach(d=>d.classList.remove('active')); div.classList.add('active'); loadMessages(); };
-    groupList.appendChild(div);
-  });
-  if(!groups.includes(currentGroup)) currentGroup = groups[0];
-  const first = groupList.querySelector('div');
-  if(first) first.classList.add('active');
-}
-renderGroups();
-
-// -----------------------------------------------------------------------------
-// Listen for groups in DB so admins can create them and everyone receives updates
-db.ref('groups').on('value', snapshot => {
-  const val = snapshot.val();
-  if(!val) return;
-  const arr = Object.values(val).map(o => o.name).filter(Boolean);
-  // merge unique
-  arr.forEach(g => { if(!groups.includes(g)) groups.push(g); });
-  renderGroups();
-});
-
-// -----------------------------------------------------------------------------
-// Listen for invite codes in DB (keep local cache)
-db.ref('inviteCodes').on('value', snap => {
-  const v = snap.val();
-  localInviteCodes = v ? Object.values(v).map(o => o.code) : [];
-  // ensure default code exists
-  if(!localInviteCodes.includes('SCHOOL123')){
-    saveInviteToDB('SCHOOL123');
-  }
-});
-
-// -----------------------------------------------------------------------------
-// Load messages (client-side filtering). For realtime updates we also listen for child_added
-let messagesCache = [];
-function loadMessages(highlight=false){
-  // Clear and render from cache filtered by group + Broadcast
-  chatBox.innerHTML='';
-  messagesCache.forEach(msg => {
-    if(msg.group !== currentGroup && msg.group !== 'Broadcast') return;
-    appendMessageElement(msg, highlight);
-  });
-  chatBox.scrollTop = chatBox.scrollHeight;
-}
-function appendMessageElement(msg, highlight){
-  const div = document.createElement('div');
-  div.className = 'message';
-  if(highlight) div.classList.add('new');
-
-  const userSpan = document.createElement('span');
-  userSpan.textContent = msg.name || msg.user;
-  userSpan.className = 'user';
-  if(admins.includes(msg.user)) userSpan.classList.add('admin');
-
-  const textSpan = document.createElement('span');
-  textSpan.textContent = ': ' + msg.text;
-  if(msg.effect) textSpan.className = msg.effect;
-
-  const timeSpan = document.createElement('span');
-  timeSpan.className = 'timestamp';
-  timeSpan.textContent = ` (${msg.timestamp || new Date(msg.createdAt).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})})`;
-
-  div.appendChild(userSpan);
-  div.appendChild(textSpan);
-  div.appendChild(timeSpan);
-  chatBox.appendChild(div);
-
-  if(div.classList.contains('new')) setTimeout(()=>{div.classList.remove('new');},2000);
-}
-
-// When new messages are added in DB, push into local cache and render if relevant
-db.ref('messages').on('child_added', snap => {
-  const msg = snap.val();
-  if(!msg) return;
-  messagesCache.push(msg);
-  // If the message is relevant to the current group or broadcast, append it
-  if(msg.group === currentGroup || msg.group === 'Broadcast'){
-    appendMessageElement(msg, true);
-    chatBox.scrollTop = chatBox.scrollHeight;
-    // Play sound / TTS
-    notifSound.play().catch(e=>{/*ignore*/});
-    if(ttsEnabled){
-      const utter = new SpeechSynthesisUtterance(msg.text);
-      speechSynthesis.cancel();
-      speechSynthesis.speak(utter);
+/* ---------------------------------------
+      ⭐ WORKING INVITE CODE CHECK
+---------------------------------------- */
+function checkInviteCode(code) {
+  return database.ref("invites/" + code).once("value").then(snapshot => {
+    if (snapshot.exists() && snapshot.val().valid === true) {
+      return true;
     }
-  }
-});
-
-// Also listen for value to populate initial cache
-db.ref('messages').once('value').then(snap => {
-  const v = snap.val();
-  messagesCache = v ? Object.values(v) : [];
-  loadMessages(false);
-});
-
-// -----------------------------------------------------------------------------
-// Persistent login (localStorage)
-if(localStorage.getItem('chatUser')){
-  currentUser = localStorage.getItem('chatUser');
-  currentName = localStorage.getItem('chatName');
-  document.getElementById('loginBox').style.display = 'none';
-  if(admins.includes(currentUser)) document.getElementById('adminPanel').style.display = 'block';
-  loadMessages();
+    return false;
+  });
 }
 
-// Login/Register flow (simple - not using Firebase Auth; stores users in DB users/ for admin listing)
-document.getElementById('loginBtn').onclick = () => {
-  const email = document.getElementById('emailInput').value.trim().toLowerCase();
-  const code = document.getElementById('inviteCodeInput').value.trim();
-  if(!email || !code) { alert('Please enter email and invite code'); return; }
-  // Check invite code from DB cache
-  if(!localInviteCodes.includes(code)){
-    alert('Invalid invite code');
+/* ---------------------------------------
+      ⭐ REGISTER WITH INVITE SYSTEM
+---------------------------------------- */
+function register() {
+  const email = document.getElementById("regEmail").value;
+  const password = document.getElementById("regPassword").value;
+  const code = document.getElementById("inviteCode").value;
+
+  if (!email || !password || !code) {
+    alert("Please fill out all fields.");
     return;
   }
-  // Accept - prompt for display name
-  currentUser = email;
-  const name = prompt('Enter your display name:');
-  if(!name) { alert('Display name required'); return; }
-  currentName = name;
-  // Save user to DB users node (no auth password used)
-  const uRef = db.ref('users').push();
-  uRef.set({email: currentUser, name: currentName, createdAt: Date.now()});
-  document.getElementById('loginBox').style.display = 'none';
-  localStorage.setItem('chatUser', currentUser);
-  localStorage.setItem('chatName', currentName);
-  if(admins.includes(currentUser)) document.getElementById('adminPanel').style.display = 'block';
-  loadMessages();
-};
 
-// -----------------------------------------------------------------------------
-// Sending messages
-function sendMessage(text,isBroadcast=false){
-  if(!text) return;
-  if(isBroadcast && !admins.includes(currentUser)) return alert("Only admin owners can broadcast!");
-  const timestamp = new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
-  const effect = (admins.includes(currentUser)) ? document.getElementById('effectSelect').value : '';
-  const msgObj = {
-    user: currentUser,
-    name: currentName,
-    group: isBroadcast ? 'Broadcast' : currentGroup,
-    text,
-    effect,
-    timestamp,
-    createdAt: Date.now()
-  };
-  saveMessageToDB(msgObj);
-  // saveMessageToDB will trigger child_added listener which will update UI
+  // Step 1 — verify invite code from Firebase
+  checkInviteCode(code).then(valid => {
+    if (!valid) {
+      alert("❌ Invalid invite code!");
+      return;
+    }
+
+    // Step 2 — register user
+    auth.createUserWithEmailAndPassword(email, password)
+      .then(user => {
+        alert("✔ Registered!");
+
+        // Step 3 — OPTIONAL: Delete invite code after use
+        database.ref("invites/" + code).remove();
+
+        // Store user info
+        database.ref("users/" + user.user.uid).set({
+          email: email,
+          created: Date.now()
+        });
+
+        showChat();
+      })
+      .catch(err => {
+        alert(err.message);
+      });
+  });
 }
 
-// Buttons
-document.getElementById('sendBtn').onclick = () => {
-  const el = document.getElementById('msgInput');
-  sendMessage(el.value);
-  el.value = '';
-};
-document.getElementById('broadcastBtn').onclick = () => {
-  const el = document.getElementById('msgInput');
-  sendMessage(el.value, true);
-  el.value = '';
-};
+/* ---------------------------------------
+      ⭐ NORMAL LOGIN
+---------------------------------------- */
+function login() {
+  const email = document.getElementById("loginEmail").value;
+  const password = document.getElementById("loginPassword").value;
 
-// Enter key sends message
-document.getElementById('msgInput').addEventListener('keypress', e => {
-  if(e.key === 'Enter'){
-    const el = document.getElementById('msgInput');
-    sendMessage(el.value);
-    el.value = '';
-  }
+  auth.signInWithEmailAndPassword(email, password)
+    .then(() => {
+      showChat();
+    })
+    .catch(err => alert(err.message));
+}
+
+/* ---------------------------------------
+      ⭐ Auto-login
+---------------------------------------- */
+auth.onAuthStateChanged(user => {
+  if (user) showChat();
 });
 
-// -----------------------------------------------------------------------------
-// Admin actions
-document.getElementById('adminClearBtn').onclick = () => {
-  if(!admins.includes(currentUser)) return alert('Admins only');
-  if(confirm('Admin clear all messages (this removes all messages from DB)?')){
-    // Remove messages node
-    db.ref('messages').remove().then(()=>{
-      messagesCache = [];
-      chatBox.innerHTML = '';
-    });
-  }
-};
+/* ---------------------------------------
+      ⭐ SHOW CHAT UI
+---------------------------------------- */
+function showChat() {
+  document.getElementById("loginScreen").style.display = "none";
+  document.getElementById("chatScreen").style.display = "flex";
+  loadMessages();
+}
 
-document.getElementById('createGroupBtn').onclick = () => {
-  const newG = document.getElementById('newGroupInput').value.trim();
-  if(!newG) return alert('Enter group name');
-  if(groups.includes(newG)) return alert('Group exists');
-  // Save to DB groups
-  saveGroupToDB(newG);
-  document.getElementById('newGroupInput').value = '';
-  // groups will be updated via DB listener automatically
-};
+/* ---------------------------------------
+      ⭐ SEND MESSAGE
+---------------------------------------- */
+function sendMessage() {
+  const msg = document.getElementById("messageInput").value;
+  if (!msg.trim()) return;
 
-document.getElementById('generateInviteBtn').onclick = () => {
-  if(!admins.includes(currentUser)) return alert('Admins only');
-  const code = 'INV' + Math.floor(Math.random()*9000 + 1000);
-  saveInviteToDB(code);
-  document.getElementById('newInviteCode').textContent = 'New code: ' + code;
-};
+  const user = auth.currentUser;
 
-// -----------------------------------------------------------------------------
-// Notification upload and TTS toggle (client-side)
-document.getElementById('notifUpload').addEventListener('change', (e) => {
-  const f = e.target.files[0];
-  if(f){
-    notifSound.src = URL.createObjectURL(f);
-    notifSound.load();
-  }
-});
-document.getElementById('ttsToggle').onclick = () => {
-  ttsEnabled = !ttsEnabled;
-  document.getElementById('ttsToggle').textContent = `TTS: ${ttsEnabled ? 'On' : 'Off'}`;
-};
-
-// -----------------------------------------------------------------------------
-// Multi-tab / multi-client sync is handled by Realtime DB listeners above.
-// But keep storage listener for backwards compatibility (if someone uses localStorage)
-window.addEventListener('storage', () => {
-  // reload messages from DB (we already listen to DB, but in case local events change)
-  db.ref('messages').once('value').then(snap => {
-    const v = snap.val();
-    messagesCache = v ? Object.values(v) : [];
-    loadMessages(false);
+  database.ref("messages").push({
+    text: msg,
+    time: Date.now(),
+    user: user.email
   });
-});
 
-// -----------------------------------------------------------------------------
-// Small safety: ensure at least the default invite code exists in DB on startup
-db.ref('inviteCodes').once('value').then(snap => {
-  const v = snap.val();
-  const codes = v ? Object.values(v).map(o => o.code) : [];
-  if(!codes.includes('SCHOOL123')){
-    saveInviteToDB('SCHOOL123');
-  }
-});
+  document.getElementById("messageInput").value = "";
+}
+
+/* ---------------------------------------
+      ⭐ LOAD MESSAGES LIVE
+---------------------------------------- */
+function loadMessages() {
+  const chatBox = document.getElementById("chatBox");
+
+  database.ref("messages").on("child_added", snapshot => {
+    const msg = snapshot.val();
+    const div = document.createElement("div");
+    div.textContent = msg.user + ": " + msg.text;
+    chatBox.appendChild(div);
+    chatBox.scrollTop = chatBox.scrollHeight;
+  });
+}
 </script>
+
 </body>
 </html>
