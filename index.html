@@ -11,7 +11,7 @@
     --card: #1f1f1f;
     --text: #ffffff;
     --input: #2a2a2a;
-    --accent: #0078ff;
+    --accent: #4285f4;
   }
 
   body.light {
@@ -19,7 +19,7 @@
     --card: #ffffff;
     --text: #000000;
     --input: #eaeaea;
-    --accent: #0078ff;
+    --accent: #4285f4;
   }
 
   * {
@@ -70,8 +70,10 @@
 
   #chatBox {
     position: absolute;
-    top: 0; left: 0;
-    right: 0; bottom: 60px;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 60px;
     padding: 10px;
     overflow-y: auto;
   }
@@ -91,7 +93,9 @@
 
   #messageInputBox {
     position: absolute;
-    left: 0; right: 0; bottom: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
     padding: 10px;
     background: var(--card);
     display: flex;
@@ -105,133 +109,109 @@
 </head>
 <body>
 
-<!-- LOGIN -->
+<!-- LOGIN SCREEN -->
 <div id="loginScreen">
   <div class="card">
-    <h2>Register / Login</h2>
-    <input id="regEmail" type="email" placeholder="Email">
-    <input id="regPassword" type="password" placeholder="Password">
-    <input id="inviteCode" type="text" placeholder="Invite Code">
-    <button onclick="register()">Register</button>
-
-    <hr style="margin: 15px 0; opacity: 0.3">
-
-    <input id="loginEmail" type="email" placeholder="Email">
-    <input id="loginPassword" type="password" placeholder="Password">
-    <button onclick="login()">Login</button>
+    <h2>Login Required</h2>
+    <p>Please log in from the main site.</p>
   </div>
 </div>
 
-<!-- CHAT -->
+<!-- CHAT SCREEN -->
 <div id="chatScreen">
   <div id="chatBox"></div>
-
   <div id="messageInputBox">
     <input id="messageInput" type="text" placeholder="Type message...">
     <button onclick="sendMessage()">Send</button>
   </div>
 </div>
 
-<!-- FIREBASE -->
-<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js"></script>
+<!-- FIREBASE (v9 modular) -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
+import {
+  getAuth,
+  onAuthStateChanged
+} from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
+import {
+  getDatabase,
+  ref,
+  push,
+  onChildAdded,
+  off
+} from "https://www.gstatic.com/firebasejs/9.23.0/firebase-database.js";
 
-<script>
-/* 🔥 CONFIG */
+/* 🔥 YOUR ORIGINAL PROJECT */
 const firebaseConfig = {
-  apiKey: "AIzaSyBIMQt_N3Z4nLabjV9Erj7SzlvHmhaqo4Q",
-  authDomain: "chat-78682.firebaseapp.com",
-  databaseURL: "https://chat-78682-default-rtdb.firebaseio.com",
-  projectId: "chat-78682",
-  storageBucket: "chat-78682.firebasestorage.app",
-  messagingSenderId: "650441779462",
-  appId: "1:650441779462:web:8ad0bc03119881ec49d687"
+  apiKey: "AIzaSyCN8ypq4TxhLwjseqnDJneBO2j_BlARz0M",
+  authDomain: "chat-or-somethig.firebaseapp.com",
+  databaseURL: "https://chat-or-somethig-default-rtdb.firebaseio.com",
+  projectId: "chat-or-somethig",
+  storageBucket: "chat-or-somethig.firebasestorage.app",
+  messagingSenderId: "598777875087",
+  appId: "1:598777875087:web:d100536dd269bc0a9d7efa",
+  measurementId: "G-VQQ0TYRNNH"
 };
 
-firebase.initializeApp(firebaseConfig);
-const auth = firebase.auth();
-const db = firebase.database();
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getDatabase(app);
 
-/* 🌗 AUTO THEME SYNC */
+const loginScreen = document.getElementById("loginScreen");
+const chatScreen = document.getElementById("chatScreen");
+const chatBox = document.getElementById("chatBox");
+const messageInput = document.getElementById("messageInput");
+
+/* 🌗 AUTO SYSTEM THEME */
 function syncTheme() {
-  const prefersLight = window.matchMedia("(prefers-color-scheme: light)").matches;
-  document.body.classList.toggle("light", prefersLight);
+  document.body.classList.toggle(
+    "light",
+    window.matchMedia("(prefers-color-scheme: light)").matches
+  );
 }
 syncTheme();
-window.matchMedia("(prefers-color-scheme: light)").addEventListener("change", syncTheme);
+window.matchMedia("(prefers-color-scheme: light)")
+  .addEventListener("change", syncTheme);
 
 /* 🔒 AUTH GATE */
-auth.onAuthStateChanged(user => {
+onAuthStateChanged(auth, user => {
   if (!user) {
-    document.getElementById("loginScreen").style.display = "flex";
-    document.getElementById("chatScreen").style.display = "none";
+    loginScreen.style.display = "flex";
+    chatScreen.style.display = "none";
     return;
   }
-  showChat();
-});
 
-/* 🔑 INVITE CHECK */
-function checkInviteCode(code) {
-  return db.ref("invites/" + code).once("value").then(s => s.exists() && s.val().valid);
-}
-
-/* 📝 REGISTER */
-function register() {
-  const email = regEmail.value;
-  const pass = regPassword.value;
-  const code = inviteCode.value;
-
-  if (!email || !pass || !code) return alert("Fill all fields");
-
-  checkInviteCode(code).then(valid => {
-    if (!valid) return alert("Invalid invite");
-
-    auth.createUserWithEmailAndPassword(email, pass).then(res => {
-      db.ref("invites/" + code).remove();
-      db.ref("users/" + res.user.uid).set({ email, created: Date.now() });
-    });
-  });
-}
-
-/* 🔐 LOGIN */
-function login() {
-  auth.signInWithEmailAndPassword(loginEmail.value, loginPassword.value)
-    .catch(e => alert(e.message));
-}
-
-/* 🟢 SHOW CHAT */
-function showChat() {
   loginScreen.style.display = "none";
   chatScreen.style.display = "flex";
-  loadMessages();
-}
+  loadMessages(user);
+});
 
-/* ✉ SEND */
-function sendMessage() {
+/* ✉ SEND MESSAGE */
+window.sendMessage = () => {
   const user = auth.currentUser;
-  if (!user) return;
+  const text = messageInput.value.trim();
+  if (!user || !text) return;
 
-  const msg = messageInput.value.trim();
-  if (!msg) return;
+  const username = user.email.split("@")[0];
 
-  db.ref("messages").push({
-    text: msg,
-    user: user.email.split("@")[0],
-    time: Date.now(),
-    uid: user.uid
+  push(ref(db, "messages"), {
+    text,
+    user: username,
+    uid: user.uid,
+    time: Date.now()
   });
 
   messageInput.value = "";
-}
+};
 
-/* 📡 LIVE CHAT */
-function loadMessages() {
+/* 📡 LOAD MESSAGES */
+function loadMessages(user) {
   chatBox.innerHTML = "";
-  db.ref("messages").off();
+  off(ref(db, "messages"));
 
-  db.ref("messages").on("child_added", snap => {
+  onChildAdded(ref(db, "messages"), snap => {
     const m = snap.val();
+
     const div = document.createElement("div");
     div.className = "msg";
     div.innerHTML = `
@@ -239,10 +219,12 @@ function loadMessages() {
       <div>${m.text}</div>
       <div class="time">${new Date(m.time).toLocaleTimeString()}</div>
     `;
+
     chatBox.appendChild(div);
     chatBox.scrollTop = chatBox.scrollHeight;
   });
 }
 </script>
+
 </body>
 </html>
