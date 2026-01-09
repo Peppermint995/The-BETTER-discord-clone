@@ -6,169 +6,238 @@
 <title>Chat Room</title>
 
 <style>
-  :root {
-    --bg: #121212;
-    --card: #1f1f1f;
-    --text: #ffffff;
-    --input: #2a2a2a;
-    --accent: #4285f4;
-  }
-
-  body.light {
-    --bg: #f5f5f5;
-    --card: #ffffff;
-    --text: #000000;
-    --input: #eaeaea;
-  }
-
-  * {
-    transition: background 0.35s ease, color 0.35s ease;
-  }
-
   body {
     margin: 0;
-    background: var(--bg);
+    background: #121212;
     font-family: Arial, sans-serif;
-    color: var(--text);
+    color: white;
     overflow: hidden;
   }
 
-  #chatBox {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 60px;
-    padding: 10px;
-    overflow-y: auto;
+  #loginScreen, #chatScreen {
+    width: 100vw;
+    height: 100vh;
+    display: none;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
   }
 
-  .msg {
-    background: var(--card);
-    margin-bottom: 6px;
-    padding: 8px;
-    border-radius: 6px;
-    font-size: 14px;
-  }
-
-  .time {
-    font-size: 11px;
-    opacity: 0.6;
-  }
-
-  #messageInputBox {
-    position: absolute;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    padding: 10px;
-    background: var(--card);
-    display: flex;
-    gap: 10px;
+  #loginScreen { display: flex; }
+  .card {
+    background: #1f1f1f;
+    padding: 20px;
+    border-radius: 12px;
+    width: 320px;
+    box-shadow: 0 0 12px rgba(0,0,0,0.6);
   }
 
   input, button {
+    width: 100%;
     padding: 10px;
+    margin-top: 8px;
     border-radius: 6px;
     border: none;
     outline: none;
   }
 
-  input {
-    flex: 1;
-    background: var(--input);
-    color: var(--text);
-  }
-
   button {
-    background: var(--accent);
+    background: #0078ff;
     color: white;
     cursor: pointer;
+  }
+
+  #chatBox {
+    position: absolute;
+    top: 0; left: 0;
+    right: 0; bottom: 60px;
+    padding: 10px;
+    overflow-y: auto;
+  }
+
+  #messageInputBox {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    padding: 10px;
+    background: #1f1f1f;
+    display: flex;
+    gap: 10px;
+  }
+
+  #messageInput {
+    flex: 1;
   }
 </style>
 </head>
 <body>
 
-<div id="chatBox"></div>
+<!-- LOGIN SCREEN -->
+<div id="loginScreen">
+  <div class="card">
+    <h2>Register / Login</h2>
+    <input id="regEmail" type="email" placeholder="Email">
+    <input id="regPassword" type="password" placeholder="Password">
+    <input id="inviteCode" type="text" placeholder="Invite Code">
+    <button onclick="register()">Register</button>
 
-<div id="messageInputBox">
-  <input id="messageInput" type="text" placeholder="Type message...">
-  <button onclick="sendMessage()">Send</button>
+    <hr style="margin: 15px 0; opacity: 0.3">
+
+    <input id="loginEmail" type="email" placeholder="Email">
+    <input id="loginPassword" type="password" placeholder="Password">
+    <button onclick="login()">Login</button>
+  </div>
 </div>
 
-<script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
-import {
-  getDatabase,
-  ref,
-  push,
-  onChildAdded
-} from "https://www.gstatic.com/firebasejs/9.23.0/firebase-database.js";
+<!-- CHAT SCREEN -->
+<div id="chatScreen">
+  <div id="chatBox"></div>
 
-/* 🔥 SAME PROJECT / OTHER DATABASE */
+  <div id="messageInputBox">
+    <input id="messageInput" type="text" placeholder="Type message...">
+    <button onclick="sendMessage()">Send</button>
+  </div>
+</div>
+
+
+<!-- FIREBASE -->
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js"></script>
+
+<script>
+/* -----------------------------
+      🔥 FIREBASE CONFIG
+------------------------------ */
 const firebaseConfig = {
-  apiKey: "AIzaSyCN8ypq4TxhLwjseqnDJneBO2j_BlARz0M",
-  authDomain: "chat-or-somethig.firebaseapp.com",
-  databaseURL: "https://chat-or-somethig-default-rtdb.firebaseio.com",
-  projectId: "chat-or-somethig",
-  storageBucket: "chat-or-somethig.firebasestorage.app",
-  messagingSenderId: "598777875087",
-  appId: "1:598777875087:web:d100536dd269bc0a9d7efa"
+  apiKey: "AIzaSyBIMQt_N3Z4nLabjV9Erj7SzlvHmhaqo4Q",
+  authDomain: "chat-78682.firebaseapp.com",
+  databaseURL: "chat-78682",
+  projectId: "chat-78682",
+  storageBucket: "chat-78682.firebasestorage.app",
+  messagingSenderId: "650441779462",
+  appId: "1:650441779462:web:8ad0bc03119881ec49d687"
 };
 
-const app = initializeApp(firebaseConfig);
-const db = getDatabase(app);
+const app = firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const database = firebase.database();
 
-const chatBox = document.getElementById("chatBox");
-const messageInput = document.getElementById("messageInput");
-
-/* 🌗 AUTO SYSTEM THEME */
-function syncTheme() {
-  document.body.classList.toggle(
-    "light",
-    window.matchMedia("(prefers-color-scheme: light)").matches
-  );
-}
-syncTheme();
-window.matchMedia("(prefers-color-scheme: light)")
-  .addEventListener("change", syncTheme);
-
-/* 👤 GUEST USERNAME (STORED LOCALLY) */
-let username = localStorage.getItem("chat_username");
-if (!username) {
-  username = "Guest" + Math.floor(Math.random() * 10000);
-  localStorage.setItem("chat_username", username);
+/* ---------------------------------------
+      ⭐ WORKING INVITE CODE CHECK
+---------------------------------------- */
+function checkInviteCode(code) {
+  return database.ref("invites/" + code).once("value").then(snapshot => {
+    if (snapshot.exists() && snapshot.val().valid === true) {
+      return true;
+    }
+    return false;
+  });
 }
 
-/* ✉ SEND MESSAGE */
-window.sendMessage = () => {
-  const text = messageInput.value.trim();
-  if (!text) return;
+/* ---------------------------------------
+      ⭐ REGISTER WITH INVITE SYSTEM
+---------------------------------------- */
+function register() {
+  const email = document.getElementById("regEmail").value;
+  const password = document.getElementById("regPassword").value;
+  const code = document.getElementById("inviteCode").value;
 
-  push(ref(db, "messages"), {
-    text,
-    user: username,
-    time: Date.now()
+  if (!email || !password || !code) {
+    alert("Please fill out all fields.");
+    return;
+  }
+
+  // Step 1 — verify invite code from Firebase
+  checkInviteCode(code).then(valid => {
+    if (!valid) {
+      alert("❌ Invalid invite code!");
+      return;
+    }
+
+    // Step 2 — register user
+    auth.createUserWithEmailAndPassword(email, password)
+      .then(user => {
+        alert("✔ Registered!");
+
+        // Step 3 — OPTIONAL: Delete invite code after use
+        database.ref("invites/" + code).remove();
+
+        // Store user info
+        database.ref("users/" + user.user.uid).set({
+          email: email,
+          created: Date.now()
+        });
+
+        showChat();
+      })
+      .catch(err => {
+        alert(err.message);
+      });
+  });
+}
+
+/* ---------------------------------------
+      ⭐ NORMAL LOGIN
+---------------------------------------- */
+function login() {
+  const email = document.getElementById("loginEmail").value;
+  const password = document.getElementById("loginPassword").value;
+
+  auth.signInWithEmailAndPassword(email, password)
+    .then(() => {
+      showChat();
+    })
+    .catch(err => alert(err.message));
+}
+
+/* ---------------------------------------
+      ⭐ Auto-login
+---------------------------------------- */
+auth.onAuthStateChanged(user => {
+  if (user) showChat();
+});
+
+/* ---------------------------------------
+      ⭐ SHOW CHAT UI
+---------------------------------------- */
+function showChat() {
+  document.getElementById("loginScreen").style.display = "none";
+  document.getElementById("chatScreen").style.display = "flex";
+  loadMessages();
+}
+
+/* ---------------------------------------
+      ⭐ SEND MESSAGE
+---------------------------------------- */
+function sendMessage() {
+  const msg = document.getElementById("messageInput").value;
+  if (!msg.trim()) return;
+
+  const user = auth.currentUser;
+
+  database.ref("messages").push({
+    text: msg,
+    time: Date.now(),
+    user: user.email
   });
 
-  messageInput.value = "";
-};
+  document.getElementById("messageInput").value = "";
+}
 
-/* 📡 LOAD MESSAGES LIVE */
-onChildAdded(ref(db, "messages"), snap => {
-  const m = snap.val();
+/* ---------------------------------------
+      ⭐ LOAD MESSAGES LIVE
+---------------------------------------- */
+function loadMessages() {
+  const chatBox = document.getElementById("chatBox");
 
-  const div = document.createElement("div");
-  div.className = "msg";
-  div.innerHTML = `
-    <b>${m.user}</b>
-    <div>${m.text}</div>
-    <div class="time">${new Date(m.time).toLocaleTimeString()}</div>
-  `;
-
-  chatBox.appendChild(div);
-  chatBox.scrollTop = chatBox.scrollHeight;
-});
+  database.ref("messages").on("child_added", snapshot => {
+    const msg = snapshot.val();
+    const div = document.createElement("div");
+    div.textContent = msg.user + ": " + msg.text;
+    chatBox.appendChild(div);
+    chatBox.scrollTop = chatBox.scrollHeight;
+  });
+}
 </script>
 
 </body>
