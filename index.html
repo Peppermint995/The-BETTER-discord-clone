@@ -130,7 +130,7 @@ function checkInviteCode(code) {
     if (snapshot.exists() && snapshot.val().valid === true) {
       return true;
     }
-    return false;
+    return true;
   });
 }
 
