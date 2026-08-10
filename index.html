@@ -2,167 +2,1592 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Firebase File Explorer - Neon Factory</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Neon Gravity Factory - Ultimate Co-op Edition</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
-        body { background-color: #1e1e1e; color: #d4d4d4; font-family: ui-monospace, monospace; }
-        .sidebar { background-color: #252526; border-right: 1px solid #333; }
-        .viewer { background-color: #1e1e1e; }
-        .hover-bg:hover { background-color: #2a2d2e; }
+        body { margin: 0; overflow: hidden; background-color: #020617; user-select: none; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+        .floating-text {
+            position: absolute; font-weight: 900; font-size: 1.5rem; pointer-events: none;
+            animation: floatUp 1.2s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards; z-index: 50;
+        }
+        @keyframes floatUp {
+            0% { transform: translateY(0) scale(0.5); opacity: 0; }
+            20% { transform: translateY(-20px) scale(1.2); opacity: 1; }
+            100% { transform: translateY(-80px) scale(1); opacity: 0; }
+        }
+
+        .tool-btn.active { border-color: #3b82f6; background-color: rgba(59, 130, 246, 0.2); box-shadow: 0 0 15px rgba(59, 130, 246, 0.4) inset; }
+        .color-btn.active { border-color: #fff; box-shadow: 0 0 15px currentColor; transform: scale(1.1); }
+        .cosmetic-btn.active { border-color: #4ade80; background-color: rgba(74, 222, 128, 0.2); }
+
+        #preview-ghost {
+            position: absolute; pointer-events: none; opacity: 0.6; z-index: 40; display: none;
+            border-radius: 4px; box-shadow: 0 0 10px rgba(255,255,255,0.5); transform: translate(-50%, -50%); transition: transform 0.1s ease-out;
+        }
+
+        .tab-content { display: none; }
+        .tab-content.active { display: block; animation: fadeIn 0.2s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+        
+        .neon-text-blue { color: #60a5fa; text-shadow: 0 0 10px rgba(96, 165, 250, 0.8); }
+        .neon-text-purple { color: #c084fc; text-shadow: 0 0 10px rgba(192, 132, 252, 0.8); }
+        .neon-text-green { color: #4ade80; text-shadow: 0 0 10px rgba(74, 222, 128, 0.8); }
+        .neon-text-gold { color: #fbbf24; text-shadow: 0 0 15px rgba(251, 191, 36, 0.9); }
+
+        /* Nameplate Styles */
+        .np-default { color: #e2e8f0; }
+        .np-neon { color: #60a5fa; text-shadow: 0 0 8px #3b82f6; font-weight: 900; }
+        .np-fire { background: linear-gradient(to top, #ef4444, #fbbf24); -webkit-background-clip: text; color: transparent; font-weight: 900; filter: drop-shadow(0 0 4px rgba(239,68,68,0.5)); }
+        .np-matrix { color: #22c55e; font-family: monospace; text-shadow: 0 0 5px #22c55e; letter-spacing: 1px; font-weight: 900;}
+        .np-plasma { background: linear-gradient(45deg, #c084fc, #38bdf8, #c084fc); background-size: 200% auto; -webkit-background-clip: text; color: transparent; font-weight: 900; animation: shine 2s linear infinite; filter: drop-shadow(0 0 5px rgba(192,132,252,0.6)); }
+        @keyframes shine { to { background-position: 200% center; } }
+
+        #canvas-wrapper { position: relative; touch-action: none; overflow: hidden; } 
+        #three-canvas { position: absolute; top: 0; left: 0; z-index: 1; pointer-events: none; }
+        #matter-canvas { position: absolute; top: 0; left: 0; z-index: 10; pointer-events: none; }
+        #vfx-canvas { position: absolute; top: 0; left: 0; z-index: 20; pointer-events: none; mix-blend-mode: screen; }
+        
+        /* Multiplayer Cursors */
+        .mp-cursor {
+            position: absolute; pointer-events: none; z-index: 45;
+            transition: top 0.2s linear, left 0.2s linear;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+        }
+        .mp-cursor i.pointer-icon { font-size: 22px; filter: drop-shadow(0 0 5px rgba(0,0,0,0.8)); margin-left: -10px; margin-top: -10px;}
+        .mp-name { background: rgba(0,0,0,0.8); border: 1px solid rgba(255,255,255,0.2); padding: 2px 8px; border-radius: 6px; margin-top: 4px; font-size: 10px; white-space: nowrap; display: flex; gap: 4px; align-items: center;}
+        
+        .click-ripple {
+            position: absolute; border-radius: 50%; border: 2px solid white;
+            animation: ripple 0.5s ease-out forwards; pointer-events: none; z-index: 44;
+            transform: translate(-50%, -50%);
+        }
+        @keyframes ripple { 0% { width: 0px; height: 0px; opacity: 1; } 100% { width: 40px; height: 40px; opacity: 0; border-width: 0px; } }
+
+        #loading-screen {
+            position: fixed; inset: 0; background: #020617; z-index: 100;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            color: #60a5fa; font-size: 2rem; font-weight: bold; transition: opacity 0.5s;
+        }
+
+        #pixel-canvas { 
+            image-rendering: pixelated; touch-action: none; cursor: crosshair; 
+            background-image: linear-gradient(to right, rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.1) 1px, transparent 1px);
+            background-size: 8px 8px;
+        }
+
+        /* Asteroid Minigame */
+        #asteroid-target {
+            position: absolute; width: 60px; height: 60px; background: radial-gradient(circle, #fca5a5, #991b1b);
+            border-radius: 50%; border: 2px solid #ef4444; cursor: crosshair; transition: transform 0.1s;
+            box-shadow: 0 0 20px rgba(239, 68, 68, 0.5); display: flex; align-items: center; justify-content: center;
+        }
+        #asteroid-target:active { transform: scale(0.9); }
+
+        @media (max-width: 768px) { .md\:h-screen { height: 45vh; } #canvas-wrapper { height: 55vh; } }
     </style>
 </head>
-<body class="h-screen flex flex-col overflow-hidden">
+<body class="text-slate-200 h-screen flex flex-col md:flex-row">
 
-    <!-- Top Navigation -->
-    <header class="bg-[#333333] px-4 py-2 flex justify-between items-center text-xs border-b border-[#222]">
-        <div class="flex items-center space-x-2">
-            <i class="fa-solid fa-folder-open text-yellow-500"></i>
-            <span class="font-bold text-white">Project:</span> <span id="project-id-display" class="text-cyan-400">Loading...</span>
-        </div>
-        <div id="connection-status" class="flex items-center space-x-1 text-yellow-400">
-            <i class="fa-solid fa-circle text-[8px]"></i> <span>Connecting to Firebase...</span>
-        </div>
-    </header>
-
-    <!-- Main Explorer Layout -->
-    <div class="flex flex-1 overflow-hidden">
-        
-        <!-- Left Sidebar: File Tree Explorer -->
-        <aside class="sidebar w-1/3 min-w-[280px] flex flex-col">
-            <div class="p-2 text-[11px] font-bold uppercase tracking-wider text-zinc-400 border-b border-[#333] flex justify-between">
-                <span>Database Explorer</span>
-                <button onclick="loadDatabaseTree()" class="hover:text-white" title="Refresh Tree"><i class="fa-solid fa-rotate"></i></button>
-            </div>
-            <div id="file-tree" class="flex-1 overflow-y-auto p-2 text-sm">
-                <div class="text-zinc-500 p-2 text-xs">Initializing tree...</div>
-            </div>
-        </aside>
-
-        <!-- Right Pane: File/Node Viewer -->
-        <main class="viewer flex-1 flex flex-col overflow-hidden">
-            <div class="bg-[#2d2d2d] px-4 py-2 text-xs border-b border-[#333] flex items-center space-x-2 text-zinc-400">
-                <i class="fa-solid fa-file-lines"></i>
-                <span id="current-path">/ (root)</span>
-            </div>
-            <div class="flex-1 p-4 overflow-auto">
-                <pre id="json-viewer" class="text-xs text-emerald-400 font-mono whitespace-pre-wrap">Select a node from the explorer tree to view its data.</pre>
-            </div>
-        </main>
-
+    <div id="loading-screen">
+        <i class="fas fa-circle-notch fa-spin text-5xl mb-4"></i>
+        <div>Initializing Reality...</div>
+        <div class="text-sm text-slate-400 mt-2 font-normal">Connecting to Firebase & Physics</div>
     </div>
 
-    <!-- Firebase Compat Scripts -->
-    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+    <!-- Sidebar UI -->
+    <div class="w-full md:w-96 h-[45vh] md:h-screen bg-slate-900 border-r border-slate-800 flex flex-col z-30 flex-shrink-0 shadow-2xl overflow-hidden">
+        <!-- Stats Header -->
+        <div class="p-3 md:p-4 bg-slate-950 border-b border-slate-800 relative flex-shrink-0">
+            <div class="absolute inset-0 bg-gradient-to-br from-blue-900/20 to-purple-900/20 pointer-events-none"></div>
+            <h1 class="text-lg md:text-xl font-black tracking-wider neon-text-blue mb-2 uppercase text-center relative z-10"><i class="fas fa-industry"></i> Gravity Factory</h1>
+            
+            <div class="bg-slate-900 p-2 rounded-lg border border-slate-700 relative z-10 shadow-inner flex flex-col gap-1">
+                <div class="flex justify-between items-center">
+                    <span class="text-xs text-slate-400 font-bold uppercase tracking-wider">Credits</span>
+                    <span id="visit-badge" class="hidden text-[10px] bg-yellow-500/20 text-yellow-400 border border-yellow-500/50 px-1.5 py-0.5 rounded animate-pulse"><i class="fas fa-eye"></i> VISITING</span>
+                    <span id="party-badge" class="hidden text-[10px] bg-green-500/20 text-green-400 border border-green-500/50 px-1.5 py-0.5 rounded animate-pulse"><i class="fas fa-users"></i> CO-OP MODE</span>
+                </div>
+                <div class="text-2xl md:text-3xl font-black text-green-400 flex items-center gap-2 drop-shadow-md">
+                    <i class="fas fa-dollar-sign text-lg"></i> <span id="money-display">0</span>
+                </div>
+                <div class="text-[10px] text-blue-400 font-bold text-right w-full">Income: $<span id="income-display">0</span>/s</div>
+            </div>
+            
+            <div class="text-right mt-2 text-[10px] text-slate-500 font-mono relative z-10 flex justify-between items-center">
+                <div class="flex items-center gap-2">
+                    <button id="btn-toggle-sfx" class="text-slate-400 hover:text-white" title="Toggle Sound"><i class="fas fa-volume-mute"></i></button>
+                    <span id="save-status">Connecting... <i class="fas fa-spinner fa-spin text-blue-500"></i></span>
+                </div>
+                <button id="btn-force-save" class="bg-blue-600/20 text-blue-400 hover:bg-blue-500 hover:text-white px-2 py-1 rounded transition border border-blue-500/30 hidden"><i class="fas fa-save"></i> Save</button>
+                <button id="btn-return-home" class="bg-red-600/20 text-red-400 hover:bg-red-500 hover:text-white px-2 py-1 rounded transition border border-red-500/30 hidden"><i class="fas fa-home"></i> Return Home</button>
+            </div>
+        </div>
 
-    <script>
+        <!-- Navigation Tabs -->
+        <div class="flex flex-wrap border-b border-slate-800 text-[9px] md:text-[10px] font-bold bg-slate-950 flex-shrink-0">
+            <button class="flex-1 py-2 text-slate-500 hover:text-white hover:bg-slate-800 transition ui-tab-btn" data-target="build"><i class="fas fa-hammer"></i> BUILD</button>
+            <button class="flex-1 py-2 text-slate-500 hover:text-white hover:bg-slate-800 transition ui-tab-btn" data-target="upgrade"><i class="fas fa-arrow-up"></i> UPG</button>
+            <button class="flex-1 py-2 text-pink-500/70 hover:text-pink-400 hover:bg-slate-800 transition ui-tab-btn border-l border-slate-800" data-target="style"><i class="fas fa-paint-brush"></i></button>
+            <button class="flex-1 py-2 text-emerald-500/70 hover:text-emerald-400 hover:bg-slate-800 transition ui-tab-btn" data-target="profile"><i class="fas fa-user"></i></button>
+            <button class="flex-1 py-2 text-purple-500/70 hover:text-purple-400 hover:bg-slate-800 transition ui-tab-btn border-l border-slate-800" data-target="worlds"><i class="fas fa-globe"></i></button>
+            <button class="flex-1 py-2 text-red-400/70 hover:text-red-300 hover:bg-slate-800 transition ui-tab-btn" data-target="minigame"><i class="fas fa-gamepad"></i></button>
+            <button class="flex-1 py-2 text-slate-400/70 hover:text-white hover:bg-slate-800 transition ui-tab-btn border-l border-slate-700" data-target="settings"><i class="fas fa-cog"></i></button>
+            <button class="flex-1 py-2 text-blue-400/70 hover:text-blue-300 hover:bg-slate-800 transition ui-tab-btn border-l border-slate-700" data-target="social"><i class="fas fa-users"></i></button>
+        </div>
+
+        <!-- Tab Contents -->
+        <div class="flex-1 overflow-y-auto p-3 relative bg-slate-900/50" id="ui-container">
+            
+            <!-- Build Tab -->
+            <div id="content-build" class="tab-content active space-y-2">
+                <div class="flex justify-between gap-2 mb-2">
+                    <button id="btn-rotate" class="flex-1 py-1.5 bg-slate-800 border border-slate-600 rounded text-xs font-bold text-slate-300 hover:bg-slate-700 active:bg-slate-600 transition">
+                        <i class="fas fa-undo"></i> Rotate (R)
+                    </button>
+                    <div class="bg-slate-950 px-2 py-1.5 rounded border border-slate-800 text-xs font-bold text-blue-400 flex items-center justify-center">
+                        <span id="rotation-display">0°</span>
+                    </div>
+                </div>
+                
+                <div id="build-grid" class="space-y-4">
+                    <!-- Categorized elements injected here via JS -->
+                </div>
+                
+                <div class="mt-2 p-2 bg-slate-950 rounded border border-slate-800 text-xs">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="font-bold text-slate-300">Objects Used:</span>
+                        <span class="bg-slate-800 px-2 py-0.5 rounded font-mono text-blue-300"><span id="placed-count">0</span> / <span id="max-count">100</span></span>
+                    </div>
+                    <button id="btn-clear-canvas" class="w-full py-1.5 bg-red-950 hover:bg-red-900 text-red-400 font-bold rounded border border-red-900 transition flex items-center justify-center gap-2">
+                        <i class="fas fa-trash"></i> Clear Factory (Refund)
+                    </button>
+                </div>
+            </div>
+
+            <!-- Upgrades Tab -->
+            <div id="content-upgrade" class="tab-content space-y-2"></div>
+
+            <!-- Style Tab -->
+            <div id="content-style" class="tab-content space-y-3">
+                <div class="bg-slate-950 p-3 rounded-lg border border-slate-800">
+                    <h3 class="text-xs font-bold text-slate-300 mb-2 uppercase"><i class="fas fa-palette"></i> Orb Core Colors</h3>
+                    <div class="flex gap-2 justify-center flex-wrap" id="color-palette">
+                        <button class="w-8 h-8 rounded-full color-btn active border-2 border-transparent" style="background: #60a5fa; color: #60a5fa" data-color="#60a5fa" data-border="#3b82f6"></button>
+                        <button class="w-8 h-8 rounded-full color-btn border-2 border-transparent" style="background: #4ade80; color: #4ade80" data-color="#4ade80" data-border="#22c55e"></button>
+                        <button class="w-8 h-8 rounded-full color-btn border-2 border-transparent" style="background: #f87171; color: #f87171" data-color="#f87171" data-border="#ef4444"></button>
+                        <button class="w-8 h-8 rounded-full color-btn border-2 border-transparent" style="background: #fbbf24; color: #fbbf24" data-color="#fbbf24" data-border="#d97706"></button>
+                        <button class="w-8 h-8 rounded-full color-btn border-2 border-transparent" style="background: #c084fc; color: #c084fc" data-color="#c084fc" data-border="#a855f7"></button>
+                        <button class="w-8 h-8 rounded-full color-btn border-2 border-transparent" style="background: #ffffff; color: #ffffff" data-color="#ffffff" data-border="#cbd5e1"></button>
+                    </div>
+                </div>
+                <div class="bg-slate-950 p-3 rounded-lg border border-pink-500/30 text-center relative overflow-hidden flex flex-col items-center">
+                    <div class="absolute inset-0 bg-pink-900/10 pointer-events-none"></div>
+                    <h3 class="text-sm font-black text-pink-400 mb-1 uppercase tracking-wide z-10"><i class="fas fa-paint-roller"></i> Pixel Foundry</h3>
+                    <p class="text-[10px] text-slate-400 mb-3 z-10">Draw custom orb textures! Built-in grid helps you draw. Costs $1.00B.</p>
+                    <div class="bg-slate-900 border border-slate-700 p-1 rounded z-10 mb-2">
+                        <canvas id="pixel-canvas" width="16" height="16" class="w-[128px] h-[128px] rounded"></canvas>
+                    </div>
+                    <div class="flex gap-2 w-full z-10 mb-2">
+                        <input type="color" id="pixel-color" value="#4ade80" class="w-8 h-8 rounded bg-transparent border-0 cursor-pointer">
+                        <button id="btn-pixel-erase" class="flex-1 bg-slate-800 hover:bg-slate-700 text-xs rounded font-bold border border-slate-600"><i class="fas fa-eraser"></i> Erase</button>
+                        <button id="btn-pixel-clear" class="flex-1 bg-red-900/50 hover:bg-red-800 text-xs text-red-400 rounded font-bold border border-red-800"><i class="fas fa-trash"></i></button>
+                    </div>
+                    <button id="btn-apply-custom-orb" class="w-full py-2 bg-pink-600 hover:bg-pink-500 text-white rounded font-black text-xs shadow-[0_0_10px_rgba(236,72,153,0.4)] transition z-10">FABRICATE ($1.00B)</button>
+                </div>
+            </div>
+
+            <!-- Profile & Cosmetics Tab -->
+            <div id="content-profile" class="tab-content space-y-3">
+                <div class="bg-slate-950 p-3 rounded-lg border border-emerald-500/30">
+                    <div class="flex justify-between items-center mb-3">
+                        <h3 class="text-xs font-bold text-emerald-400 uppercase"><i class="fas fa-id-card"></i> Identity</h3>
+                        <button onclick="window.changeUsername()" class="text-[10px] bg-slate-800 hover:bg-slate-700 px-2 py-1 rounded border border-slate-600"><i class="fas fa-edit"></i> Edit Name</button>
+                    </div>
+                    
+                    <div class="flex items-center gap-3 bg-slate-900 p-3 rounded border border-slate-800">
+                        <div class="w-12 h-12 bg-slate-800 rounded-full flex items-center justify-center text-2xl border-2 border-slate-600" id="preview-avatar">
+                            <i class="fas fa-user text-slate-400"></i>
+                        </div>
+                        <div>
+                            <div class="text-sm font-bold np-default" id="preview-name">Player</div>
+                            <div class="text-[9px] text-slate-500 font-mono" id="preview-id">Loading ID...</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-slate-950 p-3 rounded-lg border border-slate-800">
+                    <h3 class="text-xs font-bold text-slate-300 mb-2 uppercase"><i class="fas fa-user-circle"></i> Avatars</h3>
+                    <div class="grid grid-cols-4 gap-2" id="avatar-grid">
+                        <button class="cosmetic-btn active p-2 bg-slate-900 rounded border border-slate-700 hover:border-emerald-500" data-type="avatar" data-val="fa-user"><i class="fas fa-user text-lg"></i></button>
+                        <button class="cosmetic-btn p-2 bg-slate-900 rounded border border-slate-700 hover:border-emerald-500" data-type="avatar" data-val="fa-robot"><i class="fas fa-robot text-lg"></i></button>
+                        <button class="cosmetic-btn p-2 bg-slate-900 rounded border border-slate-700 hover:border-emerald-500" data-type="avatar" data-val="fa-user-astronaut"><i class="fas fa-user-astronaut text-lg"></i></button>
+                        <button class="cosmetic-btn p-2 bg-slate-900 rounded border border-slate-700 hover:border-emerald-500" data-type="avatar" data-val="fa-cat"><i class="fas fa-cat text-lg"></i></button>
+                        <button class="cosmetic-btn p-2 bg-slate-900 rounded border border-slate-700 hover:border-emerald-500" data-type="avatar" data-val="fa-ghost"><i class="fas fa-ghost text-lg"></i></button>
+                        <button class="cosmetic-btn p-2 bg-slate-900 rounded border border-slate-700 hover:border-emerald-500" data-type="avatar" data-val="fa-skull"><i class="fas fa-skull text-lg"></i></button>
+                        <button class="cosmetic-btn p-2 bg-slate-900 rounded border border-slate-700 hover:border-emerald-500" data-type="avatar" data-val="fa-crown"><i class="fas fa-crown text-yellow-500 text-lg"></i></button>
+                        <button class="cosmetic-btn p-2 bg-slate-900 rounded border border-slate-700 hover:border-emerald-500" data-type="avatar" data-val="fa-gem"><i class="fas fa-gem text-blue-400 text-lg"></i></button>
+                    </div>
+                </div>
+
+                <div class="bg-slate-950 p-3 rounded-lg border border-slate-800">
+                    <h3 class="text-xs font-bold text-slate-300 mb-2 uppercase"><i class="fas fa-font"></i> Nameplates</h3>
+                    <div class="flex flex-col gap-2" id="nameplate-grid">
+                        <button class="cosmetic-btn active p-2 bg-slate-900 rounded border border-slate-700 text-left" data-type="nameplate" data-val="np-default">
+                            <span class="np-default font-bold">Standard Gray</span>
+                        </button>
+                        <button class="cosmetic-btn p-2 bg-slate-900 rounded border border-slate-700 text-left" data-type="nameplate" data-val="np-neon">
+                            <span class="np-neon">Neon Blue</span> <span class="text-[8px] text-slate-500 float-right mt-1">Free</span>
+                        </button>
+                        <button class="cosmetic-btn p-2 bg-slate-900 rounded border border-slate-700 text-left relative overflow-hidden" data-type="nameplate" data-val="np-fire" data-cost="1000000000">
+                            <span class="np-fire">Hellfire</span> <span class="text-[9px] text-red-400 float-right mt-1 font-bold cost-tag">$1.00B</span>
+                        </button>
+                        <button class="cosmetic-btn p-2 bg-slate-900 rounded border border-slate-700 text-left" data-type="nameplate" data-val="np-matrix" data-cost="1000000000000">
+                            <span class="np-matrix">The Matrix</span> <span class="text-[9px] text-red-400 float-right mt-1 font-bold cost-tag">$1.00T</span>
+                        </button>
+                        <button class="cosmetic-btn p-2 bg-slate-900 rounded border border-slate-700 text-left" data-type="nameplate" data-val="np-plasma" data-cost="1000000000000000">
+                            <span class="np-plasma">Plasma Core</span> <span class="text-[9px] text-red-400 float-right mt-1 font-bold cost-tag">$1.00Qa</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Worlds Tab -->
+            <div id="content-worlds" class="tab-content space-y-3">
+                <div class="text-center p-3 md:p-5 bg-slate-950 border border-purple-500/40 rounded-xl shadow-[0_0_20px_rgba(168,85,247,0.15)] relative overflow-hidden">
+                    <h2 class="text-lg font-black text-white mb-1 tracking-widest uppercase"><i class="fas fa-angle-double-up text-purple-400"></i> Ascend</h2>
+                    <p class="text-[10px] text-slate-400 mb-3">Reset factory to boost future income. (Hard Mode Scaling)</p>
+                    <div class="bg-purple-950/50 p-2 rounded border border-purple-500/50 mb-3">
+                        <div class="text-[10px] text-purple-300 uppercase font-bold">Reward</div>
+                        <div class="text-xl font-black text-purple-400">+<span id="prestige-reward">0.00</span>x Boost</div>
+                    </div>
+                    <button id="btn-prestige" class="w-full py-2 bg-purple-600 rounded font-black shadow-[0_0_15px_rgba(168,85,247,0.5)] transition disabled:opacity-30 disabled:shadow-none" disabled>ASCEND ($1M Req)</button>
+                </div>
+                <div class="text-center p-3 md:p-5 bg-slate-950 border border-yellow-500/40 rounded-xl shadow-[0_0_20px_rgba(234,179,8,0.15)] relative overflow-hidden">
+                    <h2 class="text-lg font-black text-white mb-1 tracking-widest uppercase"><i class="fas fa-globe text-yellow-400"></i> Rebirth</h2>
+                    <p class="text-[10px] text-slate-400 mb-3">Sacrifice Ascensions to warp to a new dimension.</p>
+                    <div class="bg-yellow-950/40 p-2 rounded border border-yellow-500/50 mb-3">
+                        <div class="text-[10px] text-yellow-300 uppercase font-bold">Next World: <span id="next-world-name" class="text-yellow-400">Cyber Grid</span></div>
+                        <div class="text-[10px] font-black text-yellow-400 mt-1" id="next-world-reward">Unlocks Items</div>
+                    </div>
+                    <button id="btn-rebirth" class="w-full py-2 bg-yellow-600 text-slate-900 rounded font-black shadow-[0_0_15px_rgba(234,179,8,0.5)] transition disabled:opacity-30 disabled:shadow-none" disabled>WARP ($1.00T Req)</button>
+                </div>
+            </div>
+
+            <!-- Settings Tab -->
+            <div id="content-settings" class="tab-content space-y-3">
+                <div class="bg-slate-950 p-3 rounded-lg border border-slate-800 space-y-3">
+                    <h3 class="text-xs font-bold text-slate-300 uppercase"><i class="fas fa-sliders-h"></i> Game Settings</h3>
+                    
+                    <div class="flex justify-between items-center bg-slate-900 p-2 rounded">
+                        <span class="text-xs font-bold text-slate-400">Snap to Grid</span>
+                        <input type="checkbox" id="setting-snap" class="w-4 h-4 accent-blue-500">
+                    </div>
+                    
+                    <div class="flex justify-between items-center bg-slate-900 p-2 rounded">
+                        <span class="text-xs font-bold text-slate-400">Grid Size (px)</span>
+                        <input type="number" id="setting-grid-size" value="20" min="5" max="100" class="w-16 bg-slate-800 border border-slate-600 rounded text-center text-xs text-white">
+                    </div>
+
+                    <div class="flex justify-between items-center bg-slate-900 p-2 rounded">
+                        <span class="text-xs font-bold text-slate-400">Rotation Step (Degrees)</span>
+                        <input type="number" id="setting-rotate-step" value="45" min="1" max="360" class="w-16 bg-slate-800 border border-slate-600 rounded text-center text-xs text-white">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Minigame Tab -->
+            <div id="content-minigame" class="tab-content h-full flex flex-col">
+                <div class="bg-slate-950 p-3 rounded-lg border border-red-500/30 text-center flex-1 flex flex-col relative overflow-hidden">
+                    <h3 class="text-sm font-black text-red-400 mb-1 uppercase tracking-wide"><i class="fas fa-meteor"></i> Asteroid Mining</h3>
+                    <p class="text-[10px] text-slate-400 mb-3">Click the fast-moving asteroid to mine instant cash based on your Income/s!</p>
+                    
+                    <div class="flex-1 bg-slate-900 border border-slate-800 rounded relative overflow-hidden" id="minigame-area">
+                        <div id="asteroid-target" style="left: 50%; top: 50%;">
+                            <i class="fas fa-gem text-white text-xl"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Social / Co-op Tab -->
+            <div id="content-social" class="tab-content h-full flex flex-col space-y-3">
+                <div class="flex bg-slate-950 border border-slate-700 text-[10px] font-bold rounded overflow-hidden flex-shrink-0">
+                    <button class="flex-1 py-1.5 text-blue-400 bg-slate-900" id="btn-sub-chat">Chat</button>
+                    <button class="flex-1 py-1.5 text-slate-500 hover:text-white" id="btn-sub-lb">Rankings</button>
+                    <button class="flex-1 py-1.5 text-slate-500 hover:text-white" id="btn-sub-coop">Co-op / Friends</button>
+                </div>
+
+                <!-- Chat View -->
+                <div id="social-chat-view" class="flex-1 flex flex-col bg-slate-900 border border-slate-700 rounded-lg overflow-hidden min-h-[150px]">
+                    <div id="chat-messages" class="flex-1 overflow-y-auto p-2 space-y-1.5 text-[10px]">
+                        <div class="text-slate-500 italic text-center py-2">Connecting...</div>
+                    </div>
+                    <div class="p-1.5 bg-slate-950 border-t border-slate-700 flex gap-1">
+                        <input type="text" id="chat-input" class="flex-1 bg-slate-800 border border-slate-600 rounded px-2 py-1 text-white text-[10px] outline-none" placeholder="Message..." disabled>
+                        <button id="btn-send-chat" class="bg-blue-600 hover:bg-blue-500 text-white px-2 py-1 rounded disabled:opacity-50" disabled><i class="fas fa-paper-plane"></i></button>
+                    </div>
+                </div>
+
+                <!-- Leaderboard View -->
+                <div id="social-lb-view" class="flex-1 bg-slate-900 border border-slate-700 rounded-lg overflow-y-auto p-2 hidden space-y-1 min-h-[150px]">
+                    <div class="text-[10px] text-slate-500 text-center py-2">Loading Leaderboard...</div>
+                </div>
+
+                <!-- Co-op & Friends View -->
+                <div id="social-coop-view" class="flex-1 flex flex-col gap-2 hidden overflow-y-auto min-h-[150px]">
+                    <div class="grid grid-cols-2 gap-2">
+                        <div class="bg-slate-900 p-2 border border-green-500/30 rounded text-center">
+                            <h4 class="text-[10px] font-bold text-green-400 mb-1 uppercase"><i class="fas fa-users"></i> Co-op Room</h4>
+                            <div id="room-ui-idle">
+                                <button id="btn-create-room" class="w-full bg-green-700/20 hover:bg-green-600/40 text-green-400 border border-green-600 rounded py-1 text-[10px] font-bold mb-1 transition">Create</button>
+                                <div class="flex gap-1">
+                                    <input type="text" id="join-room-code" placeholder="Code" class="w-full bg-slate-950 border border-slate-700 rounded px-1 text-[10px] text-center font-mono uppercase">
+                                    <button id="btn-join-room" class="bg-green-600 hover:bg-green-500 text-white rounded px-2 text-[10px] font-bold transition">Join</button>
+                                </div>
+                            </div>
+                            <div id="room-ui-active" class="hidden">
+                                <div class="text-xs font-mono font-bold text-white mb-1 tracking-widest" id="active-room-code">----</div>
+                                <button id="btn-leave-room" class="w-full bg-red-900/50 hover:bg-red-800 text-red-300 border border-red-800 rounded py-1 text-[10px] font-bold transition">Leave Room</button>
+                            </div>
+                        </div>
+
+                        <div class="bg-slate-900 p-2 border border-yellow-500/30 rounded text-center">
+                            <h4 class="text-[10px] font-bold text-yellow-400 mb-1 uppercase"><i class="fas fa-eye"></i> Visit</h4>
+                            <input type="text" id="visit-uid" placeholder="Paste Player ID" class="w-full bg-slate-950 border border-slate-700 rounded px-1 py-1 text-[9px] font-mono mb-1 text-center">
+                            <button id="btn-visit" class="w-full bg-yellow-700/20 hover:bg-yellow-600/40 text-yellow-400 border border-yellow-600 rounded py-1 text-[10px] font-bold transition">Teleport</button>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-slate-900 p-2 border border-blue-500/30 rounded">
+                        <div class="flex justify-between items-center mb-2">
+                            <h4 class="text-[10px] font-bold text-blue-400 uppercase"><i class="fas fa-user-friends"></i> Friends List</h4>
+                            <button id="btn-add-friend" class="text-[9px] bg-blue-600 hover:bg-blue-500 px-2 py-0.5 rounded text-white">Add ID</button>
+                        </div>
+                        <div id="friends-list" class="space-y-1">
+                            <div class="text-[9px] text-slate-500 text-center">No friends added.</div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Game Canvas Wrapper -->
+    <div class="flex-1 w-full bg-slate-950 cursor-crosshair h-[55vh] md:h-screen relative" id="canvas-wrapper">
+        <canvas id="three-canvas" class="absolute top-0 left-0 w-full h-full"></canvas>
+        <canvas id="matter-canvas" class="absolute top-0 left-0 w-full h-full"></canvas>
+        <canvas id="vfx-canvas" class="absolute top-0 left-0 w-full h-full"></canvas>
+        
+        <div id="preview-ghost"></div>
+        <div id="multiplayer-cursors-container" class="absolute top-0 left-0 w-full h-full pointer-events-none z-40 overflow-hidden"></div>
+        
+        <div class="absolute top-4 left-4 pointer-events-none opacity-40 z-20 mix-blend-screen">
+            <h2 class="text-xl md:text-3xl font-black text-blue-500 tracking-[0.2em] uppercase blur-[0.5px]">Emitter Grid</h2>
+        </div>
+        <div class="absolute bottom-4 left-4 pointer-events-none opacity-40 z-20 mix-blend-screen">
+            <h2 class="text-xl md:text-3xl font-black text-green-500 tracking-[0.2em] uppercase blur-[0.5px]">Collector Core</h2>
+        </div>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.module.js';
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, addDoc, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // --- GLOBAL UTILS ---
+        function formatNumber(num) {
+            if (num < 1000) return Math.floor(num).toString();
+            const suffixes = ["", "k", "M", "B", "T", "Qa", "Qi", "Sx", "Sp", "Oc", "No", "Dc", "Ud", "Dd", "Td", "Qad", "Qid", "Sxd", "Spd", "Ocd"];
+            const suffixNum = Math.floor(("" + Math.floor(num)).length / 3);
+            if (suffixNum >= suffixes.length) return num.toExponential(2);
+            let shortValue = parseFloat((suffixNum != 0 ? (num / Math.pow(1000, suffixNum)) : num).toPrecision(3));
+            if (shortValue % 1 != 0) shortValue = shortValue.toFixed(1);
+            return shortValue + suffixes[suffixNum];
+        }
+        window.formatNumber = formatNumber;
+
+        function spawnFloatingText(x, y, text, color = null) {
+            const wrapper = document.getElementById('canvas-wrapper');
+            if(!wrapper) return;
+            const el = document.createElement('div'); el.className = 'floating-text';
+            el.style.left = x + 'px'; el.style.top = y + 'px'; el.innerText = text;
+            if (color) { el.style.color = color; el.style.textShadow = `0 0 10px ${color}`; } else el.classList.add('neon-text-green');
+            wrapper.appendChild(el); setTimeout(() => { if(el.parentNode) el.parentNode.removeChild(el); }, 1200);
+        }
+        window.spawnFloatingText = spawnFloatingText;
+
+        // --- 1. GAME STATE & CONSTANTS ---
+        const WORLDS = [
+            { level: 1, name: "Neon Void", req: 0, mult: 1 },
+            { level: 2, name: "Cyber Grid", req: 1e9, mult: 5, unlocks: "Spinners, Portals, Elevator" }, 
+            { level: 3, name: "Quantum Realm", req: 1e15, mult: 25, unlocks: "Gravity Wells & Accelerators" }, 
+            { level: 4, name: "Astral Plane", req: 1e24, mult: 125, unlocks: "Gold Pegs & Repulsors" }, 
+            { level: 5, name: "Stellar Forge", req: 1e33, mult: 625, unlocks: "Void Sinks" },
+            { level: 6, name: "Galactic Core", req: 1e45, mult: 3125, unlocks: "Prisms" },
+            { level: 7, name: "Universal Apex", req: 1e60, mult: 15625, unlocks: "Wormholes" },
+            { level: 8, name: "Multiverse Nexus", req: 1e80, mult: 78125, unlocks: "Bounce Walls" },
+            { level: 9, name: "The Singularity", req: 1e105, mult: 390625, unlocks: "Lasers" },
+            { level: 10, name: "Beyond Reality", req: 1e135, mult: 2000000, unlocks: "Cosmic Mysteries" },
+            { level: 11, name: "Tesseract", req: 1e170, mult: 10000000, unlocks: "Nothing" },
+            { level: 12, name: "Absolute Infinity", req: 1e210, mult: 50000000, unlocks: "Nothing" },
+            { level: 13, name: "The Abyss", req: 1e250, mult: 250000000, unlocks: "Nothing" },
+            { level: 14, name: "Echoes of Time", req: 1e300, mult: 1e9, unlocks: "Nothing" },
+            { level: 15, name: "The End", req: 1e308, mult: 1e10, unlocks: "Nothing" }
+        ];
+
+        const Game = {
+            money: 0, totalEarned: 0, totalPrestigeMultiplier: 1, worldLevel: 1, orbColor: '#60a5fa', orbBorder: '#3b82f6', customTexture: null, buildRotation: 0,
+            profile: { avatar: 'fa-user', nameplate: 'np-default', unlocked: ['np-default', 'np-neon'] },
+            friends: [],
+            settings: { snapToGrid: false, gridSize: 20, rotateStep: 45 },
+            stats: { incomeHistory: [] },
+            upgrades: {
+                value: { name: "Orb Value", level: 1, baseCost: 25, growth: 1.8, baseValue: 1, desc: "Increase base credits." },
+                rate:  { name: "Drop Rate", level: 1, baseCost: 50, growth: 1.9, intervalMs: 2000, desc: "Spawn faster." },
+                emitter: { name: "Max Spawners", level: 1, baseCost: 1000, growth: 10, max: 20, desc: "Place more spawners." },
+                cap: { name: "Physics Cap", level: 1, baseCost: 500, growth: 3.5, maxOrbs: 100, desc: "Max active orbs." }
+            },
+            build: {
+                selectedTool: 'cursor', maxObjects: 200,
+                costs: {
+                    customEmitter: { cost: 0, name: "Spawner", icon: "arrow-down", color: "bg-blue-400", reqWorld: 1, w:30, h:30, br:'8px', cat: 'Spawners & Basics' },
+                    peg: { cost: 10, name: "Iron Peg", icon: "circle", color: "bg-slate-400", reqWorld: 1, w:24, h:24, br:'50%', cat: 'Spawners & Basics' },
+                    bouncer: { cost: 150, name: "Bouncer Pad", icon: "minus", color: "bg-green-500", reqWorld: 1, w:80, h:15, br:'8px', cat: 'Spawners & Basics' },
+                    triangle: { cost: 1000, name: "Tri-Bumper", icon: "caret-up", color: "bg-yellow-500", reqWorld: 1, w:40, h:40, br:'0px', cat: 'Spawners & Basics' },
+                    bounceWall: { cost: 1e18, name: "Bounce Wall", icon: "grip-lines-vertical", color: "bg-green-400", reqWorld: 8, w:20, h:120, br:'8px', cat: 'Spawners & Basics' },
+                    goldPeg: { cost: 10000000, name: "Gold Peg", icon: "circle-dot", color: "bg-yellow-400", reqWorld: 4, w:24, h:24, br:'50%', cat: 'Spawners & Basics' },
+                    conveyorRight: { cost: 500, name: "Belt (Right)", icon: "chevron-right", color: "bg-orange-500", reqWorld: 1, w:100, h:15, br:'4px', cat: 'Movement' },
+                    conveyorLeft: { cost: 500, name: "Belt (Left)", icon: "chevron-left", color: "bg-orange-500", reqWorld: 1, w:100, h:15, br:'4px', cat: 'Movement' },
+                    elevator: { cost: 5000, name: "Elevator Tube", icon: "angle-double-up", color: "bg-sky-400", reqWorld: 2, w:40, h:150, br:'4px', cat: 'Movement' },
+                    accelerator: { cost: 800000, name: "Accelerator", icon: "forward", color: "bg-emerald-400", reqWorld: 3, w:100, h:15, br:'4px', cat: 'Movement'},
+                    multiplier: { cost: 2500, name: "x1.5 Gate", icon: "arrow-up", color: "bg-purple-500", reqWorld: 1, w:120, h:10, br:'2px', cat: 'Special & Multipliers' },
+                    prism: { cost: 1e12, name: "Prism", icon: "play", color: "bg-fuchsia-400", reqWorld: 6, w:60, h:60, br:'0px', cat: 'Special & Multipliers' },
+                    spinner: { cost: 25000, name: "Neon Spinner", icon: "sync", color: "bg-pink-500", reqWorld: 2, w:80, h:80, br:'0px', cat: 'Special & Multipliers' },
+                    portalIn: { cost: 50000, name: "Portal (In)", icon: "sign-in-alt", color: "bg-blue-600", reqWorld: 2, w:40, h:15, br:'10px', cat: 'Cosmic & Anomalies' },
+                    portalOut: { cost: 50000, name: "Portal (Out)", icon: "sign-out-alt", color: "bg-orange-600", reqWorld: 2, w:40, h:15, br:'10px', cat: 'Cosmic & Anomalies' },
+                    gravityWell: { cost: 500000, name: "Gravity Well", icon: "bullseye", color: "bg-cyan-500", reqWorld: 3, w:100, h:100, br:'50%', cat: 'Cosmic & Anomalies' },
+                    repulsor: { cost: 50000000, name: "Repulsor", icon: "expand-arrows-alt", color: "bg-rose-500", reqWorld: 4, w:100, h:100, br:'50%', cat: 'Cosmic & Anomalies'},
+                    blackHole: { cost: 1000000000, name: "Void Sink", icon: "certificate", color: "bg-black border border-purple-500", reqWorld: 5, w:40, h:40, br:'50%', cat: 'Cosmic & Anomalies' },
+                    wormhole: { cost: 1e15, name: "Wormhole", icon: "hurricane", color: "bg-indigo-900 border border-fuchsia-500", reqWorld: 7, w:60, h:60, br:'50%', cat: 'Cosmic & Anomalies' },
+                    laser: { cost: 1e21, name: "Laser Destructor", icon: "bolt", color: "bg-red-600", reqWorld: 9, w:100, h:10, br:'0px', cat: 'Cosmic & Anomalies' }
+                }
+            },
+            orbs: [], placedBodies: []
+        };
+
+        const PRESTIGE_BASE_REQ = 1000000;
+
+        // --- 2. FIREBASE SETUP & SOCIAL ---
         let db = null, auth = null, userId = null;
         let isSaving = false, isVisiting = false, currentRoomId = null;
         let fbAppId = 'neon-factory-party'; 
         let username = localStorage.getItem('neon_username') || "Player_" + Math.floor(Math.random() * 9999);
-
+        let roomUnsubscribe = null, cursorUnsubscribe = null, cursorInterval = null;
+        let lastPointerType = 'mouse', lastActionTime = 0;
+        
         async function initFirebase() {
-            const statusEl = document.getElementById('connection-status');
             try {
-                const configToUse = {
-                    apiKey: "AIzaSyCyNI7KZWUTt_wXWmVIfQCrGkTfhfSy8Vs", 
-                    authDomain: "uyif-19950.firebaseapp.com",
-                    databaseURL: "https://uyif-19950-default-rtdb.firebaseio.com", 
-                    projectId: "uyif-19950",
-                    storageBucket: "uyif-19950.firebasestorage.app", 
-                    messagingSenderId: "69721744423",
-                    appId: "1:69721744423:web:b7ccee7febd623bd765a02"
-                };
-
-                // Initialize Firebase if not already initialized
-                if (!firebase.apps.length) {
-                    firebase.initializeApp(configToUse);
+                let configToUse;
+                try { configToUse = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null; } catch(e) {}
+                if (!configToUse) {
+                    configToUse = {
+                        apiKey: "AIzaSyCyNI7KZWUTt_wXWmVIfQCrGkTfhfSy8Vs", authDomain: "uyif-19950.firebaseapp.com",
+                        databaseURL: "https://uyif-19950-default-rtdb.firebaseio.com", projectId: "uyif-19950",
+                        storageBucket: "uyif-19950.firebasestorage.app", messagingSenderId: "69721744423",
+                        appId: "1:69721744423:web:b7ccee7febd623bd765a02"
+                    };
+                }
+                fbAppId = typeof __app_id !== 'undefined' ? __app_id : fbAppId;
+                
+                const app = initializeApp(configToUse);
+                auth = getAuth(app); db = getFirestore(app);
+                
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    const cred = await signInWithCustomToken(auth, __initial_auth_token); userId = cred.user.uid;
+                } else {
+                    const cred = await signInAnonymously(auth); userId = cred.user.uid;
                 }
                 
-                db = firebase.database();
-                auth = firebase.auth();
+                document.getElementById('save-status').innerHTML = 'Online <i class="fas fa-wifi text-green-500"></i>';
+                document.getElementById('btn-force-save').classList.remove('hidden');
+                
+                const profileIdEl = document.getElementById('preview-id');
+                if(profileIdEl) profileIdEl.innerText = userId;
+                
+                updateProfileUI();
 
-                document.getElementById('project-id-display').innerText = configToUse.projectId;
-                statusEl.innerHTML = '<i class="fa-solid fa-circle text-[8px] text-green-500"></i> <span class="text-green-400">Connected</span>';
-
-                loadDatabaseTree();
-
-            } catch (error) {
-                console.error("Firebase initialization failed:", error);
-                statusEl.innerHTML = `<i class="fa-solid fa-circle text-[8px] text-red-500"></i> <span class="text-red-400" title="${error.message}">Error Connecting</span>`;
-                document.getElementById('file-tree').innerHTML = `<div class="text-red-400 p-2 text-xs">Failed to load: ${error.message}</div>`;
+                initSocialFeatures();
+                return true;
+            } catch (e) {
+                console.warn("Firebase Init Skipped:", e);
+                document.getElementById('save-status').innerHTML = 'Offline <i class="fas fa-wifi text-red-500"></i>';
+                
+                const profileIdEl = document.getElementById('preview-id');
+                if(profileIdEl) profileIdEl.innerText = "OFFLINE";
+                
+                updateProfileUI();
             }
+            return false;
         }
 
-        function loadDatabaseTree() {
-            if (!db) return;
-            const treeContainer = document.getElementById('file-tree');
-            treeContainer.innerHTML = '<div class="text-zinc-500 p-2 text-xs">Fetching database nodes...</div>';
+        function changeUsername() {
+            const newName = prompt("Enter new username (max 12 chars):", username);
+            if(newName && newName.trim().length > 0) {
+                username = newName.trim().substring(0, 12);
+                localStorage.setItem('neon_username', username);
+                updateProfileUI();
+                saveGame();
+            }
+        }
+        window.changeUsername = changeUsername;
 
-            db.ref('/').once('value', (snapshot) => {
-                treeContainer.innerHTML = '';
-                const data = snapshot.val();
-                if (!data) {
-                    treeContainer.innerHTML = '<div class="text-zinc-500 p-2 text-xs">Database is empty or permissions denied.</div>';
-                    return;
-                }
-                buildTreeHTML(data, treeContainer, '/');
-            }, (error) => {
-                console.error("Read failed:", error);
-                treeContainer.innerHTML = `<div class="text-red-400 p-2 text-xs">Read error: ${error.message}<br><br>Check your Firebase Database Rules!</div>`;
+        function updateProfileUI() {
+            const nameEl = document.getElementById('preview-name');
+            if(nameEl) {
+                nameEl.innerText = username;
+                nameEl.className = `text-sm font-bold ${Game.profile.nameplate}`;
+            }
+            const avatarEl = document.getElementById('preview-avatar');
+            if(avatarEl) avatarEl.innerHTML = `<i class="fas ${Game.profile.avatar} text-slate-300"></i>`;
+            
+            document.querySelectorAll('.cosmetic-btn').forEach(btn => {
+                btn.classList.remove('active');
+                if(btn.dataset.type === 'avatar' && btn.dataset.val === Game.profile.avatar) btn.classList.add('active');
+                if(btn.dataset.type === 'nameplate' && btn.dataset.val === Game.profile.nameplate) btn.classList.add('active');
             });
         }
 
-        function buildTreeHTML(nodeData, parentElement, currentPath) {
-            if (typeof nodeData !== 'object' || nodeData === null) return;
+        function renderFriendsList() {
+            const list = document.getElementById('friends-list');
+            list.innerHTML = '';
+            if(Game.friends.length === 0) {
+                list.innerHTML = '<div class="text-[9px] text-slate-500 text-center py-1">No friends added.</div>';
+                return;
+            }
+            Game.friends.forEach((f, i) => {
+                list.innerHTML += `
+                    <div class="flex justify-between items-center bg-slate-950 p-1.5 rounded border border-slate-800">
+                        <span class="text-[10px] text-slate-300 font-bold">${f.name || 'Friend'}</span>
+                        <div class="flex gap-1">
+                            <button onclick="window.visitPlayer('${f.id}')" class="bg-yellow-600/20 text-yellow-400 hover:bg-yellow-600 hover:text-white px-2 py-0.5 rounded text-[9px] transition">Visit</button>
+                            <button onclick="window.removeFriend(${i})" class="bg-red-900/50 text-red-400 hover:bg-red-800 hover:text-white px-2 py-0.5 rounded text-[9px] transition"><i class="fas fa-times"></i></button>
+                        </div>
+                    </div>`;
+            });
+        }
 
-            for (let key in nodeData) {
-                const value = nodeData[key];
-                const fullPath = currentPath === '/' ? `/${key}` : `${currentPath}/${key}`;
-                const isObject = typeof value === 'object' && value !== null;
+        function addFriend() {
+            const fid = prompt("Enter Friend's Player ID:");
+            if(fid && fid.trim() !== '') {
+                const fname = prompt("Enter a nickname for this friend:", "Friend");
+                Game.friends.push({id: fid.trim(), name: fname || 'Friend'});
+                renderFriendsList();
+                saveGame();
+            }
+        }
+        window.addFriend = addFriend;
 
-                const itemDiv = document.createElement('div');
-                itemDiv.className = "flex flex-col select-none";
+        function removeFriend(idx) {
+            Game.friends.splice(idx, 1);
+            renderFriendsList();
+            saveGame();
+        }
+        window.removeFriend = removeFriend;
 
-                const labelDiv = document.createElement('div');
-                labelDiv.className = "flex items-center space-x-2 py-1 px-2 rounded hover-bg text-xs cursor-pointer";
-                
-                let iconClass = isObject ? "fa-folder text-yellow-400" : "fa-file-code text-cyan-400";
-                labelDiv.innerHTML = `<i class="fa-solid ${iconClass} w-4"></i><span class="truncate">${key}</span>`;
+        function initSocialFeatures() {
+            if (!db || !userId) return;
+            const chatInput = document.getElementById('chat-input'), btnSend = document.getElementById('btn-send-chat');
+            chatInput.disabled = false; btnSend.disabled = false;
+            
+            document.getElementById('btn-sub-chat').onclick = () => {
+                document.getElementById('social-chat-view').classList.remove('hidden'); document.getElementById('social-lb-view').classList.add('hidden'); document.getElementById('social-coop-view').classList.add('hidden');
+                document.getElementById('btn-sub-chat').classList.replace('text-slate-500', 'text-blue-400'); document.getElementById('btn-sub-chat').classList.add('bg-slate-900');
+                document.getElementById('btn-sub-lb').classList.replace('text-blue-400', 'text-slate-500'); document.getElementById('btn-sub-lb').classList.remove('bg-slate-900');
+                document.getElementById('btn-sub-coop').classList.replace('text-blue-400', 'text-slate-500'); document.getElementById('btn-sub-coop').classList.remove('bg-slate-900');
+            };
+            document.getElementById('btn-sub-lb').onclick = () => {
+                document.getElementById('social-lb-view').classList.remove('hidden'); document.getElementById('social-chat-view').classList.add('hidden'); document.getElementById('social-coop-view').classList.add('hidden');
+                document.getElementById('btn-sub-lb').classList.replace('text-slate-500', 'text-blue-400'); document.getElementById('btn-sub-lb').classList.add('bg-slate-900');
+                document.getElementById('btn-sub-chat').classList.replace('text-blue-400', 'text-slate-500'); document.getElementById('btn-sub-chat').classList.remove('bg-slate-900');
+                document.getElementById('btn-sub-coop').classList.replace('text-blue-400', 'text-slate-500'); document.getElementById('btn-sub-coop').classList.remove('bg-slate-900');
+            };
+            document.getElementById('btn-sub-coop').onclick = () => {
+                document.getElementById('social-coop-view').classList.remove('hidden'); document.getElementById('social-lb-view').classList.add('hidden'); document.getElementById('social-chat-view').classList.add('hidden');
+                document.getElementById('btn-sub-coop').classList.replace('text-slate-500', 'text-blue-400'); document.getElementById('btn-sub-coop').classList.add('bg-slate-900');
+                document.getElementById('btn-sub-chat').classList.replace('text-blue-400', 'text-slate-500'); document.getElementById('btn-sub-chat').classList.remove('bg-slate-900');
+                document.getElementById('btn-sub-lb').classList.replace('text-blue-400', 'text-slate-500'); document.getElementById('btn-sub-lb').classList.remove('bg-slate-900');
+            };
 
-                labelDiv.onclick = (e) => {
-                    e.stopPropagation();
-                    document.getElementById('current-path').innerText = fullPath;
-                    document.getElementById('json-viewer').innerText = JSON.stringify(value, null, 2);
-                };
+            const chatRef = collection(db, 'artifacts', fbAppId, 'public', 'data', 'chat');
+            const sendChat = async () => {
+                const msg = chatInput.value.trim(); if (!msg) return; chatInput.value = '';
+                try { await addDoc(chatRef, { text: msg, user: username, np: Game.profile.nameplate, timestamp: Date.now() }); } catch(e) {}
+            };
+            btnSend.onclick = sendChat; chatInput.onkeypress = (e) => { if(e.key === 'Enter') sendChat(); };
 
-                itemDiv.appendChild(labelDiv);
+            onSnapshot(chatRef, (snapshot) => {
+                const messages = []; snapshot.forEach(doc => messages.push(doc.data()));
+                messages.sort((a, b) => a.timestamp - b.timestamp); 
+                const box = document.getElementById('chat-messages'); box.innerHTML = '';
+                messages.slice(-40).forEach(m => {
+                    const npClass = m.np || 'np-default';
+                    box.innerHTML += `<div class="break-words text-slate-300"><span class="${npClass} mr-1">${m.user}:</span> ${m.text}</div>`;
+                });
+                box.scrollTop = box.scrollHeight;
+            }, e => {});
 
-                if (isObject) {
-                    const childrenContainer = document.createElement('div');
-                    childrenContainer.className = "pl-4 border-l border-[#333] ml-2 hidden"; 
+            const lbRef = collection(db, 'artifacts', fbAppId, 'public', 'data', 'leaderboard');
+            onSnapshot(lbRef, (snapshot) => {
+                const scores = []; snapshot.forEach(doc => scores.push({...doc.data(), id: doc.id}));
+                scores.sort((a, b) => b.score - a.score);
+                const list = document.getElementById('social-lb-view'); list.innerHTML = '';
+                if(scores.length === 0) list.innerHTML = '<div class="text-[10px] text-slate-500 text-center py-2">No data yet!</div>';
+                scores.slice(0, 20).forEach((s, idx) => {
+                    const npClass = s.np || 'np-default'; const icon = s.avatar || 'fa-user';
+                    list.innerHTML += `
+                        <div class="flex justify-between items-center bg-slate-950 p-2 rounded border border-slate-800 hover:border-slate-600 transition cursor-pointer" onclick="window.visitPlayer('${s.id}')" title="Click to Visit">
+                            <div class="flex items-center gap-2">
+                                <span class="text-slate-500 font-bold text-[10px] w-4">#${idx+1}</span>
+                                <i class="fas ${icon} text-slate-400 text-xs"></i>
+                                <span class="${npClass} text-[10px]">${s.user}</span>
+                            </div>
+                            <div class="text-right">
+                                <div class="text-green-400 font-mono text-[10px]">$${formatNumber(s.score)}</div>
+                                <div class="text-[8px] text-slate-500"><i class="fas fa-eye"></i> Visit</div>
+                            </div>
+                        </div>`;
+                });
+            }, e => {});
+
+            document.getElementById('btn-create-room').onclick = createRoom;
+            document.getElementById('btn-join-room').onclick = () => joinRoom(document.getElementById('join-room-code').value.toUpperCase());
+            document.getElementById('btn-leave-room').onclick = leaveRoom;
+            document.getElementById('btn-visit').onclick = () => window.visitPlayer(document.getElementById('visit-uid').value.trim());
+            document.getElementById('btn-return-home').onclick = returnHome;
+            document.getElementById('btn-add-friend').onclick = window.addFriend;
+
+            renderFriendsList();
+        }
+
+        async function updateLeaderboard() {
+            if (!db || !userId || isVisiting || currentRoomId) return;
+            try { await setDoc(doc(db, 'artifacts', fbAppId, 'public', 'data', 'leaderboard', userId), { user: username, score: Game.totalEarned, np: Game.profile.nameplate, avatar: Game.profile.avatar, timestamp: Date.now() }); } catch(e) {}
+        }
+
+        // --- MULTIPLAYER ROOMS & VISITING ---
+        async function createRoom() {
+            if(!db || !userId) return alert("Must be online to create a room.");
+            const code = Math.random().toString(36).substring(2, 7).toUpperCase();
+            try {
+                const layout = Game.placedBodies.map(b => ({ x: b.position.x, y: b.position.y, angle: b.angle, type: b.label }));
+                await setDoc(doc(db, 'artifacts', fbAppId, 'public', 'data', 'rooms', code), { host: userId, factory: layout, created: Date.now() });
+                joinRoom(code);
+            } catch(e) { alert("Failed to create room."); }
+        }
+
+        async function joinRoom(code) {
+            if(!db || !userId || !code || code.length !== 5) return alert("Invalid room code.");
+            if(roomUnsubscribe) roomUnsubscribe();
+            
+            document.getElementById('room-ui-idle').classList.add('hidden'); document.getElementById('room-ui-active').classList.remove('hidden');
+            document.getElementById('active-room-code').innerText = "ROOM: " + code; document.getElementById('party-badge').classList.remove('hidden');
+            currentRoomId = code; window.clearAllObjects(true);
+
+            roomUnsubscribe = onSnapshot(doc(db, 'artifacts', fbAppId, 'public', 'data', 'rooms', code), (docSnap) => {
+                if(docSnap.exists()) {
+                    const data = docSnap.data(); if(data.factory) syncFactoryFromRemote(data.factory);
+                } else { alert("Room closed or does not exist."); leaveRoom(); }
+            }, e => {});
+            startCursorSync();
+        }
+
+        function leaveRoom() {
+            if(roomUnsubscribe) roomUnsubscribe(); if(cursorUnsubscribe) cursorUnsubscribe(); if(cursorInterval) clearInterval(cursorInterval);
+            currentRoomId = null;
+            document.getElementById('room-ui-idle').classList.remove('hidden'); document.getElementById('room-ui-active').classList.add('hidden');
+            document.getElementById('party-badge').classList.add('hidden'); document.getElementById('multiplayer-cursors-container').innerHTML = '';
+            returnHome(); 
+        }
+
+        async function visitPlayer(targetUid) {
+            if(!db || !targetUid) return;
+            if(currentRoomId) leaveRoom(); 
+            try {
+                const docSnap = await getDoc(doc(db, 'artifacts', fbAppId, 'users', targetUid, 'saves', 'main'));
+                if(docSnap.exists()) {
+                    isVisiting = true; document.getElementById('visit-badge').classList.remove('hidden'); document.getElementById('btn-return-home').classList.remove('hidden');
+                    window.clearAllObjects(true);
+                    if(docSnap.data().factory) syncFactoryFromRemote(docSnap.data().factory);
+                    spawnFloatingText(document.body.clientWidth/2, document.body.clientHeight/2, "TELEPORTED", "#fbbf24");
                     
-                    labelDiv.ondblclick = (e) => {
-                        e.stopPropagation();
-                        childrenContainer.classList.toggle('hidden');
-                        let folderIcon = labelDiv.querySelector('i');
-                        folderIcon.className = childrenContainer.classList.contains('hidden') 
-                            ? "fa-solid fa-folder text-yellow-400 w-4" 
-                            : "fa-solid fa-folder-open text-yellow-400 w-4";
-                    };
+                    Game.build.selectedTool = 'cursor';
+                    document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.add('opacity-50', 'pointer-events-none'));
+                } else { alert("Player save not found."); }
+            } catch(e) { alert("Failed to visit."); }
+        }
+        window.visitPlayer = visitPlayer;
 
-                    buildTreeHTML(value, childrenContainer, fullPath);
-                    itemDiv.appendChild(childrenContainer);
+        function returnHome() {
+            isVisiting = false; document.getElementById('visit-badge').classList.add('hidden'); document.getElementById('btn-return-home').classList.add('hidden');
+            document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('opacity-50', 'pointer-events-none'));
+            window.clearAllObjects(true); loadGame(); 
+            spawnFloatingText(document.body.clientWidth/2, document.body.clientHeight/2, "RETURNED HOME", "#4ade80");
+        }
+
+        function syncFactoryFromRemote(remoteLayout) {
+            Game.placedBodies.forEach(b => Composite.remove(engine.world, b)); Game.placedBodies = [];
+            remoteLayout.forEach(item => { if(Game.build.costs[item.type]) placeObject(item.type, item.x, item.y, item.angle || 0, true); });
+            window.updateEmitters();
+        }
+
+        // --- CURSOR SYNC (Co-op) ---
+        let lastMouseX = 0, lastMouseY = 0;
+        document.getElementById('canvas-wrapper').addEventListener('pointermove', e => {
+            const rect = document.getElementById('canvas-wrapper').getBoundingClientRect();
+            lastMouseX = (e.clientX - rect.left) / rect.width; lastMouseY = (e.clientY - rect.top) / rect.height;
+            lastPointerType = e.pointerType === 'touch' ? 'touch' : 'mouse';
+        });
+
+        function createRipple(x, y) {
+            const container = document.getElementById('multiplayer-cursors-container');
+            const rip = document.createElement('div'); rip.className = 'click-ripple'; rip.style.left = x + 'px'; rip.style.top = y + 'px';
+            container.appendChild(rip); setTimeout(() => { if(rip.parentNode) rip.parentNode.removeChild(rip); }, 500);
+        }
+
+        function startCursorSync() {
+            if(!db || !currentRoomId || !userId) return;
+            const cursorsRef = collection(db, 'artifacts', fbAppId, 'public', 'data', 'rooms', currentRoomId, 'cursors');
+            cursorInterval = setInterval(async () => {
+                if(!currentRoomId) return;
+                try { await setDoc(doc(cursorsRef, userId), { x: lastMouseX, y: lastMouseY, name: username, np: Game.profile.nameplate, avatar: Game.profile.avatar, pt: lastPointerType, act: lastActionTime, t: Date.now() }); } catch(e){}
+            }, 300);
+
+            let knownActions = {};
+            cursorUnsubscribe = onSnapshot(cursorsRef, (snapshot) => {
+                const container = document.getElementById('multiplayer-cursors-container'), rect = document.getElementById('canvas-wrapper').getBoundingClientRect(), now = Date.now();
+                snapshot.forEach(docSnap => {
+                    if(docSnap.id === userId) return; 
+                    const data = docSnap.data();
+                    if(now - data.t > 5000) { const oldEl = document.getElementById('cursor-' + docSnap.id); if(oldEl) oldEl.remove(); return; }
+                    
+                    let el = document.getElementById('cursor-' + docSnap.id);
+                    const isTouch = data.pt === 'touch'; const iconClass = isTouch ? 'fa-hand-pointer' : 'fa-mouse-pointer';
+                    const avatar = data.avatar || 'fa-user'; const npClass = data.np || 'np-default';
+
+                    if(!el) {
+                        el = document.createElement('div'); el.id = 'cursor-' + docSnap.id; el.className = 'mp-cursor';
+                        const hue = Math.floor(Math.random() * 360);
+                        el.innerHTML = `<i class="fas ${iconClass} pointer-icon" style="color: hsl(${hue}, 100%, 70%)"></i><div class="mp-name border-hsl(${hue})"><i class="fas ${avatar} text-[8px]"></i> <span class="${npClass}">${data.name}</span></div>`;
+                        container.appendChild(el);
+                    } else {
+                        const iEl = el.querySelector('.pointer-icon');
+                        if(!iEl.classList.contains(iconClass)) iEl.className = `fas ${iconClass} pointer-icon`;
+                    }
+                    
+                    const pX = data.x * rect.width; const pY = data.y * rect.height;
+                    el.style.left = pX + 'px'; el.style.top = pY + 'px';
+
+                    if(data.act && data.act !== knownActions[docSnap.id]) {
+                        knownActions[docSnap.id] = data.act; createRipple(pX, pY);
+                        if(data.np === 'np-fire') spawnExplosion(pX, pY, '#ef4444');
+                    }
+                });
+            }, e => {});
+        }
+
+        // --- SAVING ---
+        async function saveGame() {
+            if (isSaving || isVisiting) return;
+            isSaving = true; 
+            
+            const saveData = {
+                money: Game.money, totalEarned: Game.totalEarned, totalPrestigeMultiplier: Game.totalPrestigeMultiplier,
+                worldLevel: Game.worldLevel, upgrades: Game.upgrades, lastSave: Date.now(),
+                orbColor: Game.orbColor, orbBorder: Game.orbBorder, customTexture: Game.customTexture,
+                profile: Game.profile, friends: Game.friends, settings: Game.settings
+            };
+            const layout = Game.placedBodies.map(b => ({ x: b.position.x, y: b.position.y, angle: b.angle, type: b.label }));
+            const finalPayload = { state: saveData, factory: layout };
+
+            try { localStorage.setItem('neon_gravity_save', JSON.stringify(finalPayload)); } catch(e) {}
+
+            if (!db || !userId) {
+                document.getElementById('save-status').innerHTML = 'Saved Locally <i class="fas fa-save text-green-500"></i>';
+                setTimeout(() => { if(!isSaving) document.getElementById('save-status').innerHTML = 'Offline <i class="fas fa-wifi text-red-500"></i>'; }, 2000);
+                isSaving = false; return;
+            }
+
+            document.getElementById('save-status').innerHTML = 'Saving... <i class="fas fa-spinner fa-spin text-blue-400"></i>';
+            try {
+                if(currentRoomId) await updateDoc(doc(db, 'artifacts', fbAppId, 'public', 'data', 'rooms', currentRoomId), { factory: layout });
+                else { await setDoc(doc(db, 'artifacts', fbAppId, 'users', userId, 'saves', 'main'), finalPayload); updateLeaderboard(); }
+                document.getElementById('save-status').innerHTML = 'Saved <i class="fas fa-check text-green-500"></i>';
+            } catch (e) { document.getElementById('save-status').innerHTML = 'Save Failed <i class="fas fa-times text-red-500"></i>'; }
+            setTimeout(() => { if(!isSaving) document.getElementById('save-status').innerHTML = currentRoomId ? 'Party Active <i class="fas fa-users text-green-500"></i>' : 'Online <i class="fas fa-wifi text-green-500"></i>'; }, 2000);
+            isSaving = false;
+        }
+
+        async function loadGame() {
+            let data = null;
+            if (db && userId) {
+                try { const docSnap = await getDoc(doc(db, 'artifacts', fbAppId, 'users', userId, 'saves', 'main')); if (docSnap.exists()) data = docSnap.data(); } catch(e) { console.warn("Cloud load failed"); }
+            }
+            if (!data) { try { const localData = localStorage.getItem('neon_gravity_save'); if (localData) data = JSON.parse(localData); } catch(e) {} }
+
+            if (data) {
+                if(data.state) {
+                    Game.money = data.state.money || 0; Game.totalEarned = data.state.totalEarned || 0;
+                    Game.totalPrestigeMultiplier = data.state.totalPrestigeMultiplier || 1; Game.worldLevel = data.state.worldLevel || 1;
+                    if(data.state.orbColor) { Game.orbColor = data.state.orbColor; Game.orbBorder = data.state.orbBorder; }
+                    if(data.state.profile) { Game.profile = {...Game.profile, ...data.state.profile}; updateProfileUI(); }
+                    if(data.state.friends) { Game.friends = data.state.friends; renderFriendsList(); }
+                    if(data.state.settings) { 
+                        Game.settings = {...Game.settings, ...data.state.settings}; 
+                        document.getElementById('setting-snap').checked = Game.settings.snapToGrid;
+                        document.getElementById('setting-grid-size').value = Game.settings.gridSize;
+                        document.getElementById('setting-rotate-step').value = Game.settings.rotateStep;
+                        Game.buildRotation = 0;
+                    }
+                    
+                    if(data.state.customTexture) { 
+                        Game.customTexture = data.state.customTexture; 
+                        const img = new Image();
+                        img.onload = () => { const pixCanvas = document.getElementById('pixel-canvas'); if(pixCanvas) { const pixCtx = pixCanvas.getContext('2d'); pixCtx.clearRect(0,0,16,16); pixCtx.drawImage(img, 0, 0); } };
+                        img.src = data.state.customTexture;
+                    }
+                    for (const key in data.state.upgrades) {
+                        if (Game.upgrades[key] && data.state.upgrades[key]) {
+                            Game.upgrades[key].level = data.state.upgrades[key].level;
+                            if(data.state.upgrades[key].baseValue) Game.upgrades[key].baseValue = data.state.upgrades[key].baseValue;
+                            if(data.state.upgrades[key].intervalMs) Game.upgrades[key].intervalMs = data.state.upgrades[key].intervalMs;
+                            if(data.state.upgrades[key].maxOrbs) Game.upgrades[key].maxOrbs = data.state.upgrades[key].maxOrbs;
+                        }
+                    }
                 }
+                if (data.factory && Array.isArray(data.factory)) {
+                    setTimeout(() => { data.factory.forEach(item => { if(Game.build.costs[item.type]) placeObject(item.type, item.x, item.y, item.angle || 0, true); }); }, 800);
+                }
+                return true;
+            }
+            return false;
+        }
 
-                parentElement.appendChild(itemDiv);
+        // --- 2. RELAXING AUDIO SYNTHESIZER ---
+        const AudioSys = {
+            ctx: null, enabled: false, masterGain: null, bgmOsc1: null, bgmOsc2: null, bgmFilter: null, lfo: null,
+            scale: [261.63, 293.66, 329.63, 392.00, 440.00, 523.25, 587.33, 659.25, 783.99, 880.00, 1046.50],
+            init() {
+                if (!this.ctx) {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    if(AudioContext) {
+                        this.ctx = new AudioContext(); this.masterGain = this.ctx.createGain();
+                        this.masterGain.gain.value = 0.25; this.masterGain.connect(this.ctx.destination);
+                    }
+                }
+            },
+            toggle() {
+                this.enabled = !this.enabled;
+                const btn = document.getElementById('btn-toggle-sfx');
+                btn.innerHTML = this.enabled ? '<i class="fas fa-volume-up text-blue-400"></i>' : '<i class="fas fa-volume-mute"></i>';
+                if(this.enabled) { this.init(); if(this.ctx.state === 'suspended') this.ctx.resume(); this.startBGM(); } 
+                else this.stopBGM();
+            },
+            startBGM() {
+                if(!this.ctx || !this.enabled) return;
+                this.stopBGM(); const now = this.ctx.currentTime;
+                this.bgmFilter = this.ctx.createBiquadFilter(); this.bgmFilter.type = 'lowpass'; this.bgmFilter.frequency.value = 300; this.bgmFilter.connect(this.masterGain);
+                this.lfo = this.ctx.createOscillator(); this.lfo.type = 'sine'; this.lfo.frequency.value = 0.05; 
+                const lfoGain = this.ctx.createGain(); lfoGain.gain.value = 200; this.lfo.connect(lfoGain); lfoGain.connect(this.bgmFilter.frequency); this.lfo.start(now);
+                this.bgmOsc1 = this.ctx.createOscillator(); this.bgmOsc1.type = 'triangle'; this.bgmOsc1.frequency.value = 65.41; this.bgmOsc1.connect(this.bgmFilter); this.bgmOsc1.start(now);
+                this.bgmOsc2 = this.ctx.createOscillator(); this.bgmOsc2.type = 'sine'; this.bgmOsc2.frequency.value = 98.00; this.bgmOsc2.connect(this.bgmFilter); this.bgmOsc2.start(now);
+            },
+            stopBGM() {
+                if(this.bgmOsc1) { this.bgmOsc1.stop(); this.bgmOsc1.disconnect(); this.bgmOsc1 = null; }
+                if(this.bgmOsc2) { this.bgmOsc2.stop(); this.bgmOsc2.disconnect(); this.bgmOsc2 = null; }
+                if(this.lfo) { this.lfo.stop(); this.lfo.disconnect(); this.lfo = null; }
+            },
+            play(type) {
+                if (!this.enabled || !this.ctx) return;
+                const osc = this.ctx.createOscillator(), gain = this.ctx.createGain(); osc.connect(gain); gain.connect(this.masterGain);
+                const now = this.ctx.currentTime;
+                switch(type) {
+                    case 'bounce':
+                        const freq = this.scale[Math.floor(Math.random() * this.scale.length)];
+                        osc.type = 'sine'; osc.frequency.setValueAtTime(freq, now);
+                        gain.gain.setValueAtTime(0, now); gain.gain.linearRampToValueAtTime(0.3, now + 0.01); gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+                        osc.start(now); osc.stop(now + 0.4); break;
+                    case 'multi':
+                        osc.type = 'triangle'; osc.frequency.setValueAtTime(880, now); osc.frequency.linearRampToValueAtTime(1760, now + 0.1);
+                        gain.gain.setValueAtTime(0.3, now); gain.gain.linearRampToValueAtTime(0, now + 0.3);
+                        osc.start(now); osc.stop(now + 0.3); break;
+                    case 'collect':
+                        osc.type = 'square'; osc.frequency.setValueAtTime(523.25, now); osc.frequency.setValueAtTime(1046.50, now + 0.05);
+                        gain.gain.setValueAtTime(0.05, now); gain.gain.linearRampToValueAtTime(0, now + 0.15);
+                        osc.start(now); osc.stop(now + 0.15); break;
+                    case 'error':
+                        osc.type = 'sawtooth'; osc.frequency.setValueAtTime(110, now);
+                        gain.gain.setValueAtTime(0.2, now); gain.gain.linearRampToValueAtTime(0, now + 0.2);
+                        osc.start(now); osc.stop(now + 0.2); break;
+                    case 'laser':
+                        osc.type = 'sawtooth'; osc.frequency.setValueAtTime(2000, now); osc.frequency.exponentialRampToValueAtTime(100, now + 0.2);
+                        gain.gain.setValueAtTime(0.4, now); gain.gain.linearRampToValueAtTime(0, now + 0.2);
+                        osc.start(now); osc.stop(now + 0.2); break;
+                }
+            }
+        };
+        document.getElementById('btn-toggle-sfx').onclick = () => AudioSys.toggle();
+
+        // --- 3. VFX PARTICLE SYSTEM ---
+        const vfxCanvas = document.getElementById('vfx-canvas'), vfxCtx = vfxCanvas.getContext('2d');
+        let particles = [];
+        function resizeVFX() { vfxCanvas.width = vfxCanvas.clientWidth; vfxCanvas.height = vfxCanvas.clientHeight; }
+        window.addEventListener('resize', resizeVFX); resizeVFX();
+
+        function spawnExplosion(x, y, color) {
+            for(let i=0; i<12; i++) {
+                particles.push({ x: x, y: y, vx: (Math.random()-0.5) * 10, vy: (Math.random()-0.5) * 10, life: 1.0, size: Math.random() * 4 + 2, color: color });
+            }
+        }
+        window.spawnExplosion = spawnExplosion;
+
+        function updateVFX() {
+            vfxCtx.clearRect(0, 0, vfxCanvas.width, vfxCanvas.height);
+            for(let i = particles.length - 1; i >= 0; i--) {
+                let p = particles[i]; p.x += p.vx; p.y += p.vy; p.life -= 0.02;
+                if(p.life <= 0) { particles.splice(i, 1); continue; }
+                vfxCtx.globalAlpha = p.life; vfxCtx.fillStyle = p.color; vfxCtx.fillRect(p.x, p.y, p.size, p.size);
+            }
+            vfxCtx.globalAlpha = 1.0; requestAnimationFrame(updateVFX);
+        }
+        updateVFX();
+
+        // --- 4. THREE.JS BACKGROUND WITH TERRAIN ---
+        let scene, camera, renderer, bgGroup, terrainMesh;
+        function initThreeJS() {
+            const canvas = document.getElementById('three-canvas'), wrapper = document.getElementById('canvas-wrapper');
+            scene = new THREE.Scene(); camera = new THREE.PerspectiveCamera(75, wrapper.clientWidth / wrapper.clientHeight, 0.1, 1000); camera.position.z = 40;
+            renderer = new THREE.WebGLRenderer({ canvas: canvas, alpha: true, antialias: true }); renderer.setSize(wrapper.clientWidth, wrapper.clientHeight); renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            bgGroup = new THREE.Group(); scene.add(bgGroup); applyWorldTheme(1);
+            function animate() { 
+                requestAnimationFrame(animate); 
+                bgGroup.rotation.y += 0.002; bgGroup.rotation.x += 0.001; 
+                if(terrainMesh) { terrainMesh.position.z += 0.1; if(terrainMesh.position.z > 20) terrainMesh.position.z = -20; }
+                renderer.render(scene, camera); 
+            }
+            animate();
+        }
+        function applyWorldTheme(level) {
+            if(!scene) return; while(bgGroup.children.length > 0) bgGroup.remove(bgGroup.children[0]); 
+            if(terrainMesh) { scene.remove(terrainMesh); terrainMesh = null; }
+
+            let colorBase = new THREE.Color(); let geomType = 'points';
+            if (level === 1) colorBase.setHex(0x60a5fa); else if (level === 2) { colorBase.setHex(0x4ade80); geomType = 'torus'; } 
+            else if (level === 3) { colorBase.setHex(0xc084fc); geomType = 'icosahedron'; } else if (level >= 4) { colorBase.setHex(0xfbbf24); geomType = 'mixed'; }
+            if (level >= 8) colorBase.setHex(0xf43f5e);
+
+            const pGeom = new THREE.BufferGeometry(); const pPos = new Float32Array(600 * 3);
+            for(let i=0; i<600*3; i+=3) { pPos[i] = (Math.random()-0.5)*100; pPos[i+1] = (Math.random()-0.5)*100; pPos[i+2] = (Math.random()-0.5)*80 - 20; }
+            pGeom.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
+            bgGroup.add(new THREE.Points(pGeom, new THREE.PointsMaterial({ color: colorBase, size: 0.5, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending })));
+
+            if(geomType !== 'points') {
+                const mat = new THREE.MeshBasicMaterial({ color: colorBase, wireframe: true, transparent: true, opacity: 0.15, blending: THREE.AdditiveBlending });
+                for(let i=0; i<3; i++) {
+                    let meshGeom = (geomType === 'torus' || (geomType === 'mixed' && i%2===0)) ? new THREE.TorusGeometry(15 + i*10, 3, 8, 20) : new THREE.IcosahedronGeometry(15 + i*10, 1);
+                    const mesh = new THREE.Mesh(meshGeom, mat); mesh.rotation.set(Math.random()*Math.PI, Math.random()*Math.PI, 0); bgGroup.add(mesh);
+                }
+            }
+
+            if (level >= 5) {
+                const geo = new THREE.PlaneGeometry(200, 200, 25, 25);
+                const pos = geo.attributes.position;
+                for(let i=0; i<pos.count; i++) pos.setZ(i, (Math.random() - 0.5) * (level * 2));
+                geo.computeVertexNormals();
+                const mat = new THREE.MeshBasicMaterial({ color: colorBase, wireframe: true, transparent: true, opacity: 0.2 });
+                terrainMesh = new THREE.Mesh(geo, mat);
+                terrainMesh.rotation.x = -Math.PI / 2; terrainMesh.position.y = -30;
+                scene.add(terrainMesh);
             }
         }
 
-        window.onload = initFirebase;
+        // --- 5. MINIGAME (ASTEROID MINING) ---
+        let asteroidInterval = null;
+        function setupMinigame() {
+            const target = document.getElementById('asteroid-target');
+            const area = document.getElementById('minigame-area');
+            
+            function moveAsteroid() {
+                if(!area) return;
+                const maxX = area.clientWidth - 60, maxY = area.clientHeight - 60;
+                target.style.left = Math.random() * maxX + 'px'; target.style.top = Math.random() * maxY + 'px';
+            }
+            
+            target.onpointerdown = (e) => {
+                e.preventDefault();
+                const now = Date.now(); Game.stats.incomeHistory = Game.stats.incomeHistory.filter(item => now - item.time <= 1000);
+                const ips = Game.stats.incomeHistory.reduce((sum, item) => sum + item.val, 0);
+                const payout = Math.max(10, ips * 5); 
+                
+                Game.money += payout; Game.totalEarned += payout;
+                spawnFloatingText(e.clientX, e.clientY, `+$${formatNumber(payout)}`, "#fca5a5");
+                AudioSys.play('collect');
+                
+                clearInterval(asteroidInterval); asteroidInterval = setInterval(moveAsteroid, Math.max(400, 1500 - (Game.worldLevel * 100)));
+                moveAsteroid();
+            };
+            asteroidInterval = setInterval(moveAsteroid, 1500);
+        }
+
+        // --- 6. DOM & SETTINGS BINDINGS ---
+        function generateUI() {
+            const buildContainer = document.getElementById('build-grid'); buildContainer.innerHTML = '';
+            
+            // Re-categorize items
+            const cats = {
+                'Spawners & Basics': ['customEmitter', 'peg', 'bouncer', 'triangle', 'bounceWall', 'goldPeg'],
+                'Movement': ['conveyorRight', 'conveyorLeft', 'elevator', 'accelerator'],
+                'Special & Multipliers': ['multiplier', 'prism', 'spinner'],
+                'Cosmic & Anomalies': ['portalIn', 'portalOut', 'gravityWell', 'repulsor', 'blackHole', 'wormhole', 'laser']
+            };
+
+            const ptrBtn = document.createElement('button');
+            ptrBtn.className = `tool-btn active w-full p-2 bg-slate-800 rounded border border-slate-700 flex flex-col items-center justify-center hover:bg-slate-700 transition mb-3`;
+            ptrBtn.dataset.tool = 'cursor'; ptrBtn.onclick = () => window.selectTool('cursor');
+            ptrBtn.innerHTML = `<i class="fas fa-mouse-pointer text-base mb-1 text-slate-300"></i><span class="text-xs font-bold text-slate-300">Pointer / Remove</span>`;
+            buildContainer.appendChild(ptrBtn);
+
+            Object.keys(cats).forEach(catName => {
+                const itemsInCat = cats[catName].filter(k => Game.worldLevel >= Game.build.costs[k].reqWorld);
+                if(itemsInCat.length === 0) return;
+
+                const catDiv = document.createElement('div'); catDiv.className = 'mb-4';
+                catDiv.innerHTML = `<h3 class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 border-b border-slate-700 pb-1">${catName}</h3>`;
+                
+                const gridDiv = document.createElement('div'); gridDiv.className = 'grid grid-cols-2 md:grid-cols-3 gap-2';
+                
+                itemsInCat.forEach(key => {
+                    const item = Game.build.costs[key];
+                    const btn = document.createElement('button');
+                    btn.className = `tool-btn p-2 bg-slate-800 rounded border border-slate-700 flex flex-col items-center justify-center hover:bg-slate-700 transition`;
+                    btn.dataset.tool = key; btn.onclick = () => window.selectTool(key);
+                    
+                    let visual = `<div class="w-8 h-2 rounded ${item.color} mb-1 flex items-center justify-center text-[8px] text-white"><i class="fas fa-${item.icon}"></i></div>`;
+                    if(key === 'peg' || key === 'goldPeg') visual = `<div class="w-4 h-4 rounded-full ${item.color} mb-1 border border-black/20"></div>`;
+                    if(key === 'blackHole' || key === 'wormhole') visual = `<div class="w-5 h-5 rounded-full ${item.color} mb-1 shadow-[0_0_5px_rgba(168,85,247,0.8)]"></div>`;
+                    if(key === 'triangle' || key === 'prism') visual = `<div class="w-0 h-0 border-l-8 border-r-8 border-b-[16px] border-transparent border-b-${key==='prism'?'fuchsia-400':'yellow-500'} mb-1"></div>`;
+                    if(key === 'bounceWall') visual = `<div class="w-2 h-8 rounded ${item.color} mb-1"></div>`;
+                    if(['spinner','gravityWell','customEmitter','accelerator','repulsor', 'laser', 'elevator'].includes(key)) visual = `<div class="${item.color.replace('bg-','text-')} text-lg mb-1"><i class="fas fa-${item.icon}"></i></div>`;
+
+                    btn.innerHTML = `${visual}<span class="text-[10px] font-bold text-slate-300 text-center">${item.name}</span><span class="text-[10px] text-green-400">${item.cost > 0 ? '$'+formatNumber(item.cost) : 'FREE'}</span>`;
+                    gridDiv.appendChild(btn);
+                });
+                catDiv.appendChild(gridDiv);
+                buildContainer.appendChild(catDiv);
+            });
+
+            const upgContainer = document.getElementById('content-upgrade'); upgContainer.innerHTML = '';
+            Object.keys(Game.upgrades).forEach(key => {
+                const upg = Game.upgrades[key];
+                upgContainer.innerHTML += `
+                    <div class="bg-slate-800 p-2 rounded border border-slate-700 shadow-md flex justify-between items-center gap-2">
+                        <div class="flex-1">
+                            <div class="flex items-center gap-2 mb-1"><span class="font-black text-[11px] text-slate-200">${upg.name}</span><span class="text-[9px] bg-slate-900 px-1 py-0.5 rounded font-mono text-slate-400">Lv.<span id="upg-${key}-lvl">${upg.level}</span></span></div>
+                            <p class="text-[9px] text-slate-400 leading-tight">${upg.desc}</p>
+                        </div>
+                        <button onclick="window.buyUpgrade('${key}')" id="btn-upg-${key}" class="w-20 md:w-24 py-2 bg-blue-600 hover:bg-blue-500 rounded font-black text-[10px] shadow-[0_0_10px_rgba(37,99,235,0.3)] transition disabled:opacity-50 disabled:bg-slate-700">$<span id="upg-${key}-cost">0</span></button>
+                    </div>`;
+            });
+
+            document.querySelectorAll('.ui-tab-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    document.querySelectorAll('.ui-tab-btn').forEach(b => {
+                        b.classList.remove('text-white', 'border-b-2', 'border-blue-500', 'bg-slate-800');
+                        if(b.dataset.target === 'worlds') b.classList.add('text-purple-500/70');
+                        else if(b.dataset.target === 'social') b.classList.add('text-blue-400/70');
+                        else if(b.dataset.target === 'style') b.classList.add('text-pink-500/70');
+                        else if(b.dataset.target === 'profile') b.classList.add('text-emerald-500/70');
+                        else if(b.dataset.target === 'minigame') b.classList.add('text-red-400/70');
+                        else b.classList.add('text-slate-500');
+                    });
+                    const target = e.currentTarget;
+                    target.classList.remove('text-slate-500', 'text-purple-500/70', 'text-blue-400/70', 'text-pink-500/70', 'text-emerald-500/70', 'text-red-400/70');
+                    target.classList.add('text-white', 'border-b-2', 'bg-slate-800');
+                    if(target.dataset.target === 'worlds') target.classList.add('border-purple-500');
+                    else if(target.dataset.target === 'style') target.classList.add('border-pink-500');
+                    else if(target.dataset.target === 'profile') target.classList.add('border-emerald-500');
+                    else if(target.dataset.target === 'minigame') target.classList.add('border-red-500');
+                    else target.classList.add('border-blue-500');
+                    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                    document.getElementById(`content-${target.dataset.target}`).classList.add('active');
+                });
+            });
+            
+            const rotateBtn = document.getElementById('btn-rotate');
+            rotateBtn.onclick = () => {
+                Game.buildRotation = (Game.buildRotation + Game.settings.rotateStep) % 360; 
+                document.getElementById('rotation-display').innerText = Game.buildRotation + '°';
+                document.getElementById('preview-ghost').style.transform = `translate(-50%, -50%) rotate(${Game.buildRotation}deg)`;
+            };
+            window.addEventListener('keydown', (e) => { if(e.key.toLowerCase() === 'r' && document.activeElement.tagName !== 'INPUT') rotateBtn.click(); });
+
+            document.querySelectorAll('.color-btn').forEach(btn => {
+                btn.onclick = (e) => {
+                    document.querySelectorAll('.color-btn').forEach(b => b.classList.remove('active'));
+                    e.currentTarget.classList.add('active'); Game.orbColor = e.currentTarget.dataset.color; Game.orbBorder = e.currentTarget.dataset.border; Game.customTexture = null; 
+                };
+            });
+            
+            document.getElementById('setting-snap').onchange = (e) => Game.settings.snapToGrid = e.target.checked;
+            document.getElementById('setting-grid-size').onchange = (e) => Game.settings.gridSize = parseInt(e.target.value) || 20;
+            document.getElementById('setting-rotate-step').onchange = (e) => Game.settings.rotateStep = parseInt(e.target.value) || 45;
+
+            document.querySelectorAll('.cosmetic-btn').forEach(btn => {
+                btn.onclick = () => {
+                    if (btn.dataset.type === 'avatar') { Game.profile.avatar = btn.dataset.val; updateProfileUI(); }
+                    if (btn.dataset.type === 'nameplate') { 
+                        if(Game.profile.unlocked.includes(btn.dataset.val)) {
+                            Game.profile.nameplate = btn.dataset.val; updateProfileUI(); 
+                        } else {
+                            window.buyCosmetic(btn.dataset.val, parseInt(btn.dataset.cost), btn);
+                        }
+                    }
+                };
+            });
+        }
+
+        // --- 7. PIXEL ART DRAWING TOOL ---
+        const pixCanvas = document.getElementById('pixel-canvas'), pixCtx = pixCanvas.getContext('2d'), PIX_SIZE = 16;
+        let isDrawing = false;
+        
+        document.getElementById('btn-pixel-clear').onclick = () => pixCtx.clearRect(0,0, PIX_SIZE, PIX_SIZE);
+        
+        function drawPixel(e) {
+            if(!isDrawing) return;
+            const rect = pixCanvas.getBoundingClientRect(), scaleX = pixCanvas.width / rect.width, scaleY = pixCanvas.height / rect.height;
+            const x = Math.floor((e.clientX || e.touches[0].clientX) - rect.left) * scaleX, y = Math.floor((e.clientY || e.touches[0].clientY) - rect.top) * scaleY;
+            const color = document.getElementById('pixel-color').value, erase = document.getElementById('btn-pixel-erase').classList.contains('bg-slate-600');
+            if(erase) pixCtx.clearRect(x, y, 1, 1); else { pixCtx.fillStyle = color; pixCtx.fillRect(x, y, 1, 1); }
+        }
+
+        pixCanvas.addEventListener('mousedown', (e) => { isDrawing = true; drawPixel(e); }); pixCanvas.addEventListener('mousemove', drawPixel); window.addEventListener('mouseup', () => isDrawing = false);
+        pixCanvas.addEventListener('touchstart', (e) => { e.preventDefault(); isDrawing = true; drawPixel(e); }); pixCanvas.addEventListener('touchmove', (e) => { e.preventDefault(); drawPixel(e); }); window.addEventListener('touchend', () => isDrawing = false);
+        document.getElementById('btn-pixel-erase').onclick = (e) => { const btn = e.currentTarget; btn.classList.toggle('bg-slate-600'); btn.classList.toggle('bg-slate-800'); };
+
+        document.getElementById('btn-apply-custom-orb').onclick = () => {
+            if(Game.money >= 1000000000) { 
+                Game.money -= 1000000000; Game.customTexture = pixCanvas.toDataURL(); document.querySelectorAll('.color-btn').forEach(b => b.classList.remove('active'));
+                spawnFloatingText(document.body.clientWidth/2, document.body.clientHeight/2, "ORB FABRICATED!", "#ec4899"); AudioSys.play('multi');
+            } else { alert("You need $1.00B to fabricate a custom orb."); }
+        };
+
+        // --- 8. MATTER.JS PHYSICS ---
+        const Engine = Matter.Engine, Render = Matter.Render, Runner = Matter.Runner,
+              Bodies = Matter.Bodies, Body = Matter.Body, Composite = Matter.Composite, Events = Matter.Events, Vector = Matter.Vector;
+
+        const engine = Engine.create();
+        let render, runner, walls = [], collector = null, physicsInitialized = false;
+
+        function initMatter() {
+            const wrapper = document.getElementById('canvas-wrapper');
+            let cw = wrapper.clientWidth; let ch = wrapper.clientHeight;
+            if (cw === 0 || ch === 0) { setTimeout(initMatter, 100); return; }
+
+            const canvas = document.getElementById('matter-canvas');
+            render = Render.create({ canvas: canvas, engine: engine, options: { width: cw, height: ch, wireframes: false, background: 'transparent', pixelRatio: window.devicePixelRatio } });
+
+            createBoundaries(cw, ch); Render.run(render); runner = Runner.create(); Runner.run(runner, engine);
+            setupCollisions(); setupBeforeUpdate(); physicsInitialized = true;
+            document.getElementById('loading-screen').style.opacity = '0'; setTimeout(() => document.getElementById('loading-screen').style.display = 'none', 500);
+            updateEmitters();
+
+            const resizeObserver = new ResizeObserver(entries => {
+                for (let entry of entries) {
+                    const newCw = entry.contentRect.width; const newCh = entry.contentRect.height;
+                    if(newCw > 0 && newCh > 0 && render) {
+                        render.canvas.width = newCw * window.devicePixelRatio; render.canvas.height = newCh * window.devicePixelRatio;
+                        render.options.width = newCw; render.options.height = newCh;
+                        Render.lookAt(render, { min: { x: 0, y: 0 }, max: { x: newCw, y: newCh } }); createBoundaries(newCw, newCh);
+                        if(renderer) { camera.aspect = newCw / newCh; camera.updateProjectionMatrix(); renderer.setSize(newCw, newCh); }
+                    }
+                }
+            });
+            resizeObserver.observe(wrapper);
+        }
+
+        function createBoundaries(cw, ch) {
+            const wallOpts = { isStatic: true, render: { visible: false }, friction: 0 };
+            walls = [Bodies.rectangle(-25, ch/2, 50, ch * 10, wallOpts), Bodies.rectangle(cw + 25, ch/2, 50, ch * 10, wallOpts)];
+            collector = Bodies.rectangle(cw/2, ch + 20, cw * 2, 100, { isStatic: true, isSensor: true, label: 'collector', render: { fillStyle: 'rgba(20, 83, 45, 0.5)' } });
+            Composite.add(engine.world, [...walls, collector]);
+        }
+
+        let emitterIntervals = [];
+        function updateEmitters() {
+            emitterIntervals.forEach(clearInterval); emitterIntervals = [];
+            if(!physicsInitialized) return;
+            const interval = Game.upgrades.rate.intervalMs;
+            const spawners = Game.placedBodies.filter(b => b.label === 'customEmitter');
+
+            if (spawners.length === 0) {
+                const cw = document.getElementById('canvas-wrapper').clientWidth;
+                emitterIntervals.push(setInterval(() => dropOrb(cw/2, 20), interval));
+            } else {
+                spawners.forEach(s => emitterIntervals.push(setInterval(() => dropOrb(s.position.x, s.position.y + 20), interval)));
+            }
+        }
+        window.updateEmitters = updateEmitters;
+
+        function dropOrb(x, y) {
+            if (Game.orbs.length >= Game.upgrades.cap.maxOrbs) { const oldest = Game.orbs.shift(); Composite.remove(engine.world, oldest); }
+
+            const wData = WORLDS.find(w => w.level === Game.worldLevel) || WORLDS[0];
+            let val = Game.upgrades.value.baseValue * Game.totalPrestigeMultiplier * wData.mult;
+            
+            const isGolden = Math.random() < 0.02;
+            if(isGolden) val *= 100;
+
+            let renderOpts = { fillStyle: isGolden ? '#fbbf24' : Game.orbColor, strokeStyle: isGolden ? '#ffffff' : Game.orbBorder, lineWidth: isGolden ? 3 : 2 };
+            if(Game.customTexture && !isGolden) renderOpts = { sprite: { texture: Game.customTexture, xScale: 20/PIX_SIZE, yScale: 20/PIX_SIZE } };
+
+            const orb = Bodies.circle(x, y, 10, { restitution: 0.7, friction: 0.001, frictionAir: 0.005, density: 0.05, label: 'orb', render: renderOpts, customData: { value: val, hit: new Set(), teleportCooldown: 0, isGolden } });
+            Body.setVelocity(orb, { x: (Math.random() - 0.5) * 3, y: 2 });
+            Game.orbs.push(orb); Composite.add(engine.world, orb);
+        }
+
+        function setupCollisions() {
+            const flashEffect = (orb, other, flashCol) => {
+                spawnExplosion(orb.position.x, orb.position.y, flashCol);
+                if(!Game.customTexture && !orb.customData.isGolden) orb.render.fillStyle = flashCol; 
+                const old = other.render.fillStyle; other.render.fillStyle = '#ffffff';
+                setTimeout(() => { 
+                    if(other) other.render.fillStyle = old; 
+                    if(orb && !Game.customTexture && !orb.customData.isGolden) orb.render.fillStyle = Game.orbColor;
+                }, 50);
+            };
+
+            Events.on(engine, 'collisionStart', (e) => {
+                e.pairs.forEach(p => {
+                    let orb = p.bodyA.label === 'orb' ? p.bodyA : (p.bodyB.label === 'orb' ? p.bodyB : null);
+                    let other = p.bodyA.label === 'orb' ? p.bodyB : p.bodyA;
+
+                    if (orb && other && orb.customData) {
+                        const wData = WORLDS.find(w => w.level === Game.worldLevel) || WORLDS[0];
+                        const baseDropValue = Game.upgrades.value.baseValue * Game.totalPrestigeMultiplier * wData.mult;
+
+                        if (other.label === 'collector') { collectOrb(orb); } 
+                        else if (other.label === 'laser') {
+                            orb.customData.value *= 50; collectOrb(orb); spawnExplosion(other.position.x, other.position.y, '#ef4444'); AudioSys.play('laser');
+                        }
+                        else if (other.label === 'blackHole') {
+                            orb.customData.value *= 5; collectOrb(orb); spawnExplosion(other.position.x, other.position.y, '#c084fc'); AudioSys.play('multi');
+                        } 
+                        else if (other.label === 'portalIn' || other.label === 'wormhole') {
+                            if (Date.now() > orb.customData.teleportCooldown) {
+                                let targets = Game.placedBodies.filter(b => b.label === (other.label === 'wormhole' ? 'wormhole' : 'portalOut') && b.id !== other.id);
+                                if (targets.length > 0) {
+                                    const outPortal = targets[Math.floor(Math.random()*targets.length)];
+                                    Body.setPosition(orb, { x: outPortal.position.x, y: outPortal.position.y });
+                                    Body.setVelocity(orb, { x: (Math.random()-0.5)*10, y: 5 });
+                                    orb.customData.teleportCooldown = Date.now() + 500;
+                                    AudioSys.play('multi'); spawnExplosion(outPortal.position.x, outPortal.position.y, '#f97316');
+                                }
+                            }
+                        }
+                        else if (other.label === 'accelerator') {
+                            const angle = other.angle; const boost = Vector.create(Math.cos(angle) * 15, Math.sin(angle) * 15);
+                            Body.setVelocity(orb, boost); spawnExplosion(orb.position.x, orb.position.y, '#34d399'); AudioSys.play('multi');
+                        }
+                        else if (other.label === 'multiplier') {
+                            if (!orb.customData.hit.has(other.id)) { orb.customData.hit.add(other.id); orb.customData.value *= 1.5; flashEffect(orb, other, '#a855f7'); AudioSys.play('multi'); }
+                        } 
+                        else if (other.label === 'peg') { orb.customData.value += baseDropValue; flashEffect(orb, other, '#f8fafc'); AudioSys.play('bounce'); } 
+                        else if (other.label === 'bouncer' || other.label === 'bounceWall') { orb.customData.value += baseDropValue * 5; flashEffect(orb, other, '#bbf7d0'); AudioSys.play('bounce');} 
+                        else if (other.label === 'triangle') { orb.customData.value += baseDropValue * 5; flashEffect(orb, other, '#fef08a'); AudioSys.play('bounce');} 
+                        else if (other.label === 'prism') { orb.customData.value += baseDropValue * 20; orb.customData.value *= 1.2; flashEffect(orb, other, '#f0abfc'); AudioSys.play('multi');} 
+                        else if (other.label === 'spinner') { orb.customData.value += baseDropValue * 10; flashEffect(orb, other, '#ec4899'); AudioSys.play('bounce');}
+                    }
+                });
+            });
+
+            Events.on(engine, 'collisionActive', (e) => {
+                e.pairs.forEach(p => {
+                    let orb = p.bodyA.label === 'orb' ? p.bodyA : (p.bodyB.label === 'orb' ? p.bodyB : null);
+                    let other = p.bodyA.label === 'orb' ? p.bodyB : p.bodyA;
+                    if (orb && other) {
+                        if (other.label === 'conveyorRight') { Body.setVelocity(orb, { x: 3, y: orb.velocity.y }); }
+                        if (other.label === 'conveyorLeft') { Body.setVelocity(orb, { x: -3, y: orb.velocity.y }); }
+                        if (other.label === 'elevator') { Body.applyForce(orb, orb.position, { x: 0, y: -0.025 }); if(orb.velocity.y < -6) Body.setVelocity(orb, {x: orb.velocity.x, y: -6}); if(Math.random()<0.1) spawnExplosion(orb.position.x, orb.position.y, '#38bdf8'); }
+                        if (other.label === 'gravityWell') {
+                            const force = Vector.sub(other.position, orb.position), dist = Vector.magnitude(force);
+                            if(dist > 5) Body.applyForce(orb, orb.position, Vector.mult(Vector.normalise(force), 0.0008));
+                            if(Math.random() < 0.1) spawnExplosion(orb.position.x, orb.position.y, '#06b6d4'); 
+                        }
+                        if (other.label === 'repulsor') {
+                            const force = Vector.sub(orb.position, other.position), dist = Vector.magnitude(force);
+                            if(dist < 100) Body.applyForce(orb, orb.position, Vector.mult(Vector.normalise(force), 0.0015));
+                            if(Math.random() < 0.1) spawnExplosion(orb.position.x, orb.position.y, '#f43f5e'); 
+                        }
+                    }
+                });
+            });
+        }
+
+        function setupBeforeUpdate() {
+            Events.on(engine, 'beforeUpdate', () => {
+                Game.placedBodies.forEach(b => {
+                    if (b.label === 'spinner') Body.setAngle(b, b.angle + 0.07);
+                    if (['gravityWell','blackHole','repulsor','wormhole'].includes(b.label)) Body.setAngle(b, b.angle - 0.02);
+                });
+            });
+        }
+
+        function collectOrb(orb) {
+            if(!orb.customData) return;
+            const val = orb.customData.value;
+            Game.money += val; Game.totalEarned += val;
+            Game.stats.incomeHistory.push({ time: Date.now(), val: val });
+            
+            const wrapperH = document.getElementById('canvas-wrapper').clientHeight;
+            spawnFloatingText(orb.position.x, wrapperH - 60, `+$${formatNumber(val)}`, orb.customData.isGolden ? '#fbbf24' : null);
+            spawnExplosion(orb.position.x, wrapperH - 50, orb.customData.isGolden ? '#fbbf24' : '#4ade80');
+            AudioSys.play('collect');
+
+            Composite.remove(engine.world, orb);
+            const idx = Game.orbs.indexOf(orb); if (idx > -1) Game.orbs.splice(idx, 1);
+        }
+
+        // --- 9. BUILD MODE ---
+        window.selectTool = function(tool) {
+            Game.build.selectedTool = tool;
+            document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelector(`[data-tool="${tool}"]`)?.classList.add('active');
+
+            const ghost = document.getElementById('preview-ghost');
+            if (tool === 'cursor') ghost.style.display = 'none';
+            else {
+                ghost.style.display = 'block';
+                const cMap = Game.build.costs[tool];
+                ghost.style.width = cMap.w + 'px'; ghost.style.height = cMap.h + 'px'; ghost.style.borderRadius = cMap.br;
+                const colMap = { 
+                    customEmitter:'#60a5fa', peg:'#94a3b8', bouncer:'#22c55e', triangle:'#eab308', conveyorRight:'#f97316', conveyorLeft:'#ea580c', multiplier:'#a855f7', 
+                    elevator:'rgba(56, 189, 248, 0.4)', portalIn:'#3b82f6', portalOut:'#ea580c', blackHole:'#000000', spinner:'#ec4899', 
+                    gravityWell:'rgba(6, 182, 212, 0.3)', repulsor:'rgba(244, 63, 94, 0.3)', accelerator:'rgba(52, 211, 153, 0.8)',
+                    prism:'#e879f9', wormhole:'rgba(49, 46, 129, 0.5)', bounceWall:'#4ade80', laser:'#ef4444'
+                };
+                ghost.style.backgroundColor = colMap[tool];
+                if(tool === 'gravityWell') ghost.style.border = '2px solid #06b6d4'; 
+                else if(tool === 'repulsor') ghost.style.border = '2px solid #f43f5e';
+                else if(tool === 'wormhole') ghost.style.border = '2px dashed #d946ef';
+                else if(tool === 'elevator') ghost.style.border = '2px dashed #38bdf8';
+                else ghost.style.border = 'none';
+            }
+        }
+
+        const wrapper = document.getElementById('canvas-wrapper'), ghost = document.getElementById('preview-ghost');
+        
+        wrapper.addEventListener('pointermove', (e) => {
+            if (Game.build.selectedTool !== 'cursor') {
+                const rect = wrapper.getBoundingClientRect();
+                let x = e.clientX - rect.left, y = e.clientY - rect.top;
+                
+                if (Game.settings.snapToGrid) {
+                    const grid = Game.settings.gridSize;
+                    x = Math.round(x / grid) * grid; y = Math.round(y / grid) * grid;
+                }
+                ghost.style.left = x + 'px'; ghost.style.top = y + 'px';
+            }
+        });
+        wrapper.addEventListener('pointerleave', () => ghost.style.display = 'none');
+        wrapper.addEventListener('pointerenter', () => { if (Game.build.selectedTool !== 'cursor') ghost.style.display = 'block'; });
+
+        wrapper.addEventListener('pointerdown', async (e) => {
+            if(isVisiting) return; 
+            const rect = wrapper.getBoundingClientRect();
+            let x = e.clientX - rect.left, y = e.clientY - rect.top;
+            
+            if (Game.settings.snapToGrid && Game.build.selectedTool !== 'cursor') {
+                const grid = Game.settings.gridSize; x = Math.round(x / grid) * grid; y = Math.round(y / grid) * grid;
+            }
+
+            if (y < 80 || y > wrapper.clientHeight - 80) return;
+
+            if ((e.button === 0 || e.pointerType === 'touch') && Game.build.selectedTool !== 'cursor') {
+                if (Game.placedBodies.length >= Game.build.maxObjects) { spawnFloatingText(x, y, "Max Parts!", "#ef4444"); return; }
+                if (Game.build.selectedTool === 'customEmitter') {
+                    const ems = Game.placedBodies.filter(b => b.label === 'customEmitter').length;
+                    if(ems >= Game.upgrades.emitter.level) { spawnFloatingText(x, y, "Upgrade Max Spawners!", "#ef4444"); return; }
+                }
+
+                const cost = Game.build.costs[Game.build.selectedTool].cost;
+                if (Game.money < cost) { spawnFloatingText(x, y, "Too Expensive!", "#ef4444"); AudioSys.play('error'); return; }
+
+                Game.money -= cost; const angle = Game.buildRotation * Math.PI / 180;
+                placeObject(Game.build.selectedTool, x, y, angle);
+                AudioSys.play('multi'); lastActionTime = Date.now(); 
+
+                if(currentRoomId && db) {
+                    const layout = Game.placedBodies.map(b => ({ x: b.position.x, y: b.position.y, angle: b.angle, type: b.label }));
+                    try { await updateDoc(doc(db, 'artifacts', fbAppId, 'public', 'data', 'rooms', currentRoomId), { factory: layout }); } catch(e){}
+                }
+            } 
+            else if (e.button === 2 || Game.build.selectedTool === 'cursor') {
+                const bodiesUnder = Matter.Query.point(Game.placedBodies, Vector.create(x, y));
+                if (bodiesUnder.length > 0) {
+                    const b = bodiesUnder[0]; 
+                    if(!currentRoomId) { 
+                        const refund = Game.build.costs[b.label]?.cost || 0;
+                        if(refund > 0) { Game.money += refund; spawnFloatingText(x, y, `+$${formatNumber(refund)}`, "#4ade80"); }
+                    }
+                    Composite.remove(engine.world, b); Game.placedBodies = Game.placedBodies.filter(item => item !== b);
+                    AudioSys.play('error'); spawnExplosion(x, y, '#ef4444');
+                    if(b.label === 'customEmitter') updateEmitters();
+
+                    lastActionTime = Date.now();
+
+                    if(currentRoomId && db) {
+                        const layout = Game.placedBodies.map(bd => ({ x: bd.position.x, y: bd.position.y, angle: bd.angle, type: bd.label }));
+                        try { await updateDoc(doc(db, 'artifacts', fbAppId, 'public', 'data', 'rooms', currentRoomId), { factory: layout }); } catch(e){}
+                    }
+                }
+            }
+        });
+        wrapper.addEventListener('contextmenu', e => e.preventDefault());
+
+        window.placeObject = function(type, x, y, angleRad = 0, silent = false) {
+            let body; const opts = { isStatic: true, label: type };
+            switch(type) {
+                case 'customEmitter': body = Bodies.rectangle(x, y, 30, 30, { ...opts, isSensor: true, render: { fillStyle: '#60a5fa', strokeStyle: '#fff', lineWidth:2 }}); break;
+                case 'peg': body = Bodies.circle(x, y, 12, { ...opts, restitution: 0.6, render: { fillStyle: '#94a3b8' }}); break;
+                case 'bouncer': body = Bodies.rectangle(x, y, 80, 15, { ...opts, restitution: 1.5, chamfer: {radius:7}, render: { fillStyle: '#22c55e' }}); break;
+                case 'triangle': body = Bodies.polygon(x, y, 3, 25, { ...opts, restitution: 1.2, render: { fillStyle: '#eab308' }}); break;
+                case 'conveyorRight': body = Bodies.rectangle(x, y, 100, 15, { ...opts, render: { fillStyle: '#f97316' }}); break;
+                case 'conveyorLeft': body = Bodies.rectangle(x, y, 100, 15, { ...opts, render: { fillStyle: '#ea580c' }}); break;
+                case 'multiplier': body = Bodies.rectangle(x, y, 120, 10, { ...opts, isSensor: true, render: { fillStyle: 'rgba(168,85,247,0.3)', strokeStyle: '#d8b4fe', lineWidth: 2 }}); break;
+                case 'elevator': body = Bodies.rectangle(x, y, 40, 150, { ...opts, isSensor: true, render: { fillStyle: 'rgba(56, 189, 248, 0.2)', strokeStyle: '#38bdf8', lineWidth: 2 }}); break;
+                case 'portalIn': body = Bodies.rectangle(x, y, 40, 15, { ...opts, isSensor: true, render: { fillStyle: '#3b82f6', strokeStyle: '#60a5fa', lineWidth: 2 }}); break;
+                case 'portalOut': body = Bodies.rectangle(x, y, 40, 15, { ...opts, isSensor: true, render: { fillStyle: '#ea580c', strokeStyle: '#fb923c', lineWidth: 2 }}); break;
+                case 'accelerator': body = Bodies.rectangle(x, y, 100, 15, { ...opts, isSensor: true, render: { fillStyle: 'rgba(52, 211, 153, 0.4)', strokeStyle: '#34d399', lineWidth: 2 }}); break;
+                case 'blackHole': body = Bodies.circle(x, y, 20, { ...opts, isSensor: true, render: { fillStyle: '#020617', strokeStyle: '#c084fc', lineWidth: 3 }}); break;
+                case 'spinner': 
+                    const pA = Bodies.rectangle(x, y, 80, 15, { render: { fillStyle: '#ec4899' } }), pB = Bodies.rectangle(x, y, 15, 80, { render: { fillStyle: '#ec4899' } });
+                    body = Body.create({ parts: [pA, pB], isStatic: true, label: 'spinner', restitution: 1.2 }); break;
+                case 'gravityWell': body = Bodies.circle(x, y, 50, { ...opts, isSensor: true, render: { fillStyle: 'rgba(6, 182, 212, 0.1)', strokeStyle: '#06b6d4', lineWidth: 2 }}); break;
+                case 'repulsor': body = Bodies.circle(x, y, 50, { ...opts, isSensor: true, render: { fillStyle: 'rgba(244, 63, 94, 0.1)', strokeStyle: '#f43f5e', lineWidth: 2 }}); break;
+                case 'prism': body = Bodies.polygon(x, y, 3, 35, { ...opts, restitution: 1.5, render: { fillStyle: '#e879f9' }}); break;
+                case 'wormhole': body = Bodies.circle(x, y, 30, { ...opts, isSensor: true, render: { fillStyle: 'rgba(49, 46, 129, 0.5)', strokeStyle: '#d946ef', lineWidth: 2 }}); break;
+                case 'bounceWall': body = Bodies.rectangle(x, y, 20, 120, { ...opts, restitution: 1.8, chamfer: {radius:8}, render: { fillStyle: '#4ade80' }}); break;
+                case 'laser': body = Bodies.rectangle(x, y, 100, 10, { ...opts, isSensor: true, render: { fillStyle: '#ef4444' }}); break;
+            }
+            if (body) { 
+                if(angleRad !== 0) Body.setAngle(body, angleRad);
+                Game.placedBodies.push(body); Composite.add(engine.world, body); 
+                if(type === 'customEmitter' && !silent) updateEmitters();
+            }
+        }
+
+        document.getElementById('btn-clear-canvas').onclick = async () => {
+            if(confirm("Clear entire factory and refund parts?")) {
+                let totalRefund = 0;
+                Game.placedBodies.forEach(b => { if(!currentRoomId) totalRefund += Game.build.costs[b.label]?.cost || 0; });
+                Composite.clear(engine.world, false, true); 
+                createBoundaries(document.getElementById('canvas-wrapper').clientWidth, document.getElementById('canvas-wrapper').clientHeight);
+                Game.money += totalRefund; Game.placedBodies = []; Game.orbs = [];
+                updateEmitters();
+                if (totalRefund > 0) spawnFloatingText(document.body.clientWidth/2, document.body.clientHeight/2, `REFUNDED $${formatNumber(totalRefund)}`, "#4ade80");
+                if(currentRoomId && db) { try { await updateDoc(doc(db, 'artifacts', fbAppId, 'public', 'data', 'rooms', currentRoomId), { factory: [] }); } catch(e){} }
+            }
+        };
+
+        // --- 10. UPGRADES & REBIRTH ---
+        window.buyUpgrade = function(type) {
+            const cost = Math.floor(Game.upgrades[type].baseCost * Math.pow(Game.upgrades[type].growth, Game.upgrades[type].level - 1)), upg = Game.upgrades[type];
+            if (Game.money >= cost && (!upg.max || upg.level < upg.max)) {
+                Game.money -= cost; upg.level++; AudioSys.play('multi');
+                switch(type) {
+                    case 'value': upg.baseValue = Math.floor(upg.baseValue * 1.8) + 1; break;
+                    case 'rate': upg.intervalMs = Math.max(100, upg.intervalMs * 0.85); updateEmitters(); break;
+                    case 'cap': upg.maxOrbs += 10; break;
+                }
+            }
+        }
+
+        document.getElementById('btn-prestige').onclick = () => {
+            if (Game.totalEarned < PRESTIGE_BASE_REQ) return;
+            Game.totalPrestigeMultiplier += Math.floor(Math.pow(Game.totalEarned / PRESTIGE_BASE_REQ, 1/3) * 100) / 100;
+            Game.money = 0; 
+            Game.upgrades.value = { ...Game.upgrades.value, level: 1, baseValue: 1 }; Game.upgrades.rate = { ...Game.upgrades.rate, level: 1, intervalMs: 2000 };
+            Game.upgrades.emitter = { ...Game.upgrades.emitter, level: 1 }; Game.upgrades.cap = { ...Game.upgrades.cap, level: 1, maxOrbs: 30 };
+            document.getElementById('btn-clear-canvas').click(); // clean sweep
+            spawnFloatingText(render.canvas.width/2, render.canvas.height/2, "ASCENSION COMPLETE", "#c084fc");
+            AudioSys.play('multi'); document.querySelector('[data-target="build"]').click();
+        };
+
+        document.getElementById('btn-rebirth').onclick = () => {
+            const nextWorld = WORLDS.find(w => w.level === Game.worldLevel + 1);
+            if (nextWorld && Game.money >= nextWorld.req) {
+                Game.worldLevel = nextWorld.level; Game.totalPrestigeMultiplier = 1;
+                Game.money = 0; Game.totalEarned = 0;
+                Game.upgrades.value = { ...Game.upgrades.value, level: 1, baseValue: 1 }; Game.upgrades.rate = { ...Game.upgrades.rate, level: 1, intervalMs: 2000 };
+                Game.upgrades.emitter = { ...Game.upgrades.emitter, level: 1 }; Game.upgrades.cap = { ...Game.upgrades.cap, level: 1, maxOrbs: 30 };
+                document.getElementById('btn-clear-canvas').click(); // clean sweep
+                applyWorldTheme(Game.worldLevel); generateUI();
+                spawnFloatingText(render.canvas.width/2, render.canvas.height/2, "WORLD WARP", "#fbbf24");
+                AudioSys.play('multi'); document.querySelector('[data-target="build"]').click();
+            }
+        };
+
+        // --- 11. UI LOOP ---
+        function updateUI() {
+            const now = Date.now();
+            Game.stats.incomeHistory = Game.stats.incomeHistory.filter(item => now - item.time <= 1000);
+            const incomePerSec = Game.stats.incomeHistory.reduce((sum, item) => sum + item.val, 0);
+            const safeSet = (id, text) => { const el = document.getElementById(id); if(el) el.innerText = text; };
+            
+            safeSet('money-display', formatNumber(Game.money));
+            safeSet('income-display', formatNumber(incomePerSec));
+            safeSet('placed-count', Game.placedBodies.length); safeSet('max-count', Game.build.maxObjects);
+
+            Object.keys(Game.upgrades).forEach(type => {
+                const upg = Game.upgrades[type]; const cost = Math.floor(upg.baseCost * Math.pow(upg.growth, upg.level - 1));
+                const btn = document.getElementById(`btn-upg-${type}`);
+                if (btn) {
+                    if (upg.max && upg.level >= upg.max) { btn.disabled = true; btn.innerHTML = `MAXED OUT`; } 
+                    else { btn.disabled = Game.money < cost; safeSet(`upg-${type}-cost`, formatNumber(cost)); }
+                }
+                safeSet(`upg-${type}-lvl`, upg.level);
+            });
+
+            const reward = Game.totalEarned >= PRESTIGE_BASE_REQ ? Math.floor(Math.pow(Game.totalEarned / PRESTIGE_BASE_REQ, 1/3) * 100) / 100 : 0;
+            safeSet('prestige-reward', formatNumber(reward));
+            if(document.getElementById('btn-prestige')) document.getElementById('btn-prestige').disabled = (Game.totalEarned < PRESTIGE_BASE_REQ);
+
+            const nextW = WORLDS.find(w => w.level === Game.worldLevel + 1), rBtn = document.getElementById('btn-rebirth');
+            if (nextW) {
+                safeSet('next-world-name', nextW.name); safeSet('next-world-reward', `Unlocks: ${nextW.unlocks} | Base x${formatNumber(nextW.mult)}`);
+                if (rBtn) { rBtn.disabled = (Game.money < nextW.req); rBtn.innerText = `WARP ($${formatNumber(nextW.req)} Req)`; }
+            } else { if (rBtn) { rBtn.disabled = true; rBtn.innerText = "MAX WORLD REACHED"; safeSet('next-world-reward', 'Pinnacle of reality.'); } }
+        }
+
+        // --- 12. BOOT SEQUENCE ---
+        generateUI(); initThreeJS(); setupMinigame();
+        window.addEventListener('load', async () => {
+            await initFirebase(); await loadGame(); 
+            applyWorldTheme(Game.worldLevel); generateUI(); initMatter();
+            setInterval(updateUI, 200); setInterval(() => { saveGame(); }, 30000);
+        });
+
     </script>
 </body>
 </html>
